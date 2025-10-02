@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8 Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f0f0f0; }
+        #video-container { width: 100%; }
+        video { width: 100%; height: 70vh; background-color: #000; }
+        #logo-grid { display: flex; flex-wrap: wrap; justify-content: center; padding: 10px; background-color: #fff; }
+        .logo { cursor: pointer; margin: 10px; transition: transform 0.2s; width: 120px; height: auto; }
+        .logo:hover { transform: scale(1.1); }
+        .playing-logo { border: 3px solid #007bff; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="video-container">
+        <video id="video" controls></video>
+    </div>
+    <div id="logo-grid"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const logoGrid = document.getElementById('logo-grid');
+        let hls = new Hls();
+
+        const channels = [
+            { name: "tvN", url: "http://warlock0.synology.me:9999/klive/api/url.m3u8?m=url&s=tving&i=C00551&q=FHD&apikey=5MY50EII66", logo: "https://via.placeholder.com/120x80.png?text=tvN" },
+            { name: "KBS1", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs1_540&sid=fyAvvD3F74POZh6GmE2btRtXE3FRA7x4WA5l1B5m&secret=f1ecf5d3c1cda86dc1eb741cec2e91bf&time=1742499426", logo: "https://via.placeholder.com/120x80.png?text=KBS1" },
+            { name: "KBS2", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs2_540&sid=nGwIH0XSiD8i6BgNlw1BzsZ9ZkNGavHRb7KWRaUB&secret=24378334b2628dc756899977221fbe37&time=1742499579", logo: "https://via.placeholder.com/120x80.png?text=KBS2" },
+            { name: "MBC", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=mbc_540&sid=OiF7QW8tv67KzSp46AumV3RRfFzaM23xbWGWK1EE&secret=52841b1a2fc1ea3572f35742831c2823&time=1746640316", logo: "https://via.placeholder.com/120x80.png?text=MBC" },
+            { name: "SBS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=sbs_540&sid=pgl0MLCBpuhYsXqyNXvAxTpnwsO7Z0LIv6TjzgW7&secret=3890d3e89e3ba3c4fe9c7bf7e93b7db1&time=1746640387", logo: "https://via.placeholder.com/120x80.png?text=SBS" },
+            { name: "EBS1", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=ebs_1_540&sid=hYnLduDv8nt54u8V33fzOzX2965Hpw5riMGhlJ3R&secret=49acbb73b9d018958342b304a2c5c7f4&time=1742556411", logo: "https://via.placeholder.com/120x80.png?text=EBS1" },
+            { name: "EBS2", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=ebs_2_540&sid=0wonnSSHsGui3yCUVS2h68L4nXKpocbek6UATVNu&secret=b6c54f84829101b5d1159e0143a063e1&time=1742556563", logo: "https://via.placeholder.com/120x80.png?text=EBS2" },
+            { name: "JTBC", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=jtbc_540&sid=ueRIPcU1CmpLxvesJU3p3VVgAfWDA7Gq6Ok1SwdS&secret=7e0fd7ca14ec47bd96aca368dade12a4&time=1742499897", logo: "https://via.placeholder.com/120x80.png?text=JTBC" },
+            { name: "OCN", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=ocn_540&sid=PrqoQCvTSMHCbYJxID74xAc3NKuScy5PRuM1xirg&secret=562fb04d97cad7f46e7b55f63214df25&time=1747425397", logo: "https://via.placeholder.com/120x80.png?text=OCN" },
+            { name: "OCN Movies", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=cgv_540&sid=ITjFbSesTCA6lhGQOkb3FkEBcBDIkkRJMIxUQdCp&secret=5d308748415770c93f1f9f0c0ed6e8b6&time=1747425455", logo: "https://via.placeholder.com/120x80.png?text=OCN+Movies" },
+            { name: "OCN Movies2", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=super_action_540&sid=QPacI6i2eH4RJ3EUx6gV4cCyzBRIBmJJyITwSCrN&secret=20e95b15862eb7628d7e1db6ef6dff2d&time=1742502255", logo: "https://via.placeholder.com/120x80.png?text=OCN+Movies2" },
+            { name: "CJ ENM Movie", url: "https://jmp2.uk/stvp-KRBC32000191N", logo: "https://via.placeholder.com/120x80.png?text=CJ+ENM+Movie" },
+            { name: "PLAYY", url: "https://jmp2.uk/stvp-KR12000017G", logo: "https://via.placeholder.com/120x80.png?text=PLAYY" },
+            { name: "YTN", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=ytn_540&sid=HxS8g2O614Z22pnhG5974Hey06SlgSHeT24eUPwD&secret=3d4c2a8304d1673ecd3114c5c6f48568&time=1742500356", logo: "https://via.placeholder.com/120x80.png?text=YTN" },
+            { name: "뉴스Y", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=newsy_540&sid=DzpUFHjcsBWVT59UIekH9Ru1NlsNITdMENCIwOYj&secret=627df873aaaabccbbfacb5cf54826ff2&time=1742500601", logo: "https://via.placeholder.com/120x80.png?text=뉴스Y" },
+            { name: "tvN Sports", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=olivetv_540&sid=8LbyMvKsXavagjD6y1ZNlDZMivTbD8w8Ylaki0aF&secret=4f3264b31cd2376538d9af4207f9be85&time=1745187636", logo: "https://via.placeholder.com/120x80.png?text=tvN+Sports" },
+            { name: "KBSNSPORTS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs_n_sports_540&sid=2d4lU588IfghL2opd7HM63yE2wS8H52ARHw5HXRQ&secret=2352918e6d64f698127757fa594e1ff4&time=1742500742", logo: "https://via.placeholder.com/120x80.png?text=KBSNSPORTS" },
+            { name: "MBC SPORTS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=mbc_sports_540&sid=9bv6hEGMpr1RCdE1DpMiWx2PrX8a8kKE1GMt0dJ6&secret=acef719ee24b555d553a928126e2bbd1&time=1742500830", logo: "https://via.placeholder.com/120x80.png?text=MBC+SPORTS" },
+            { name: "SKY SPORTS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=sky_sports_540&sid=izUD3XjpFBIK6xFNQ1BcgBGH5Ldy0HVkyD5UoRSO&secret=63f2413d9711c04b1a825c8e733a5204&time=1756907428", logo: "https://via.placeholder.com/120x80.png?text=SKY+SPORTS" },
+            { name: "SBS SPORTS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=sbs_sports_540&sid=XMv6aPlBrU1o23QTwnURWnfHoRT7hOQ8nwH7wK9H&secret=849647c33502f9f8d1a1d67e20719008&time=1742501076", logo: "https://via.placeholder.com/120x80.png?text=SBS+SPORTS" },
+            { name: "SBS GOLF", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=sbs_golf_540&sid=8No4oKWpRJMbb9rsAuWQ75ACx37sUj3gRkeLupvY&secret=72464b0ac707bb73f4d46a2e1082e64f&time=1748029685", logo: "https://via.placeholder.com/120x80.png?text=SBS+GOLF" },
+            { name: "JTBC GOLF", url: "http://211.110.63.98/jtbcgolf1/_definst_/8C4A78EB4291B2BA8795B9AF907E8A9B28DBF956ADF0AB46A0C5E48207BC8773/chunklist_w1885910863.m3u8", logo: "https://via.placeholder.com/120x80.png?text=JTBC+GOLF" },
+            { name: "JTBC GOLF&SPORTS", url: "http://211.110.63.98/jtbc3sports1/_definst_/92EE8BC280FBC3F170429AC55F0234B0E9A288DD1A54804514EA4B2D1D861D79/chunklist_w2059444615.m3u8", logo: "https://via.placeholder.com/120x80.png?text=JTBC+GOLF%26SPORTS" },
+            { name: "PGA Tour", url: "https://jmp2.uk/stvp-KRBD3100007WB", logo: "https://via.placeholder.com/120x80.png?text=PGA+Tour" },
+            { name: "스크린골프", url: "https://jmp2.uk/stvp-KR44000010Y", logo: "https://via.placeholder.com/120x80.png?text=스크린골프" },
+            { name: "JTBC3", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=jtbc_3_540&sid=Apn7LTiUje3L7FmQObTgYnKBNeDUDytdiUSkqYw1&secret=7e6facc78d8f68a85388b1945d966a04&time=1742501522", logo: "https://via.placeholder.com/120x80.png?text=JTBC3" },
+            { name: "SPOTV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=spotv_540&sid=w9sTaDbkcNRJ1Op6LvowKsB9qiIwEXaLK6jQmc9a&secret=700a37478a2572879ff8a64e7e43faa9&time=1742501358", logo: "https://via.placeholder.com/120x80.png?text=SPOTV" },
+            { name: "SPOTV2", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=spotv_2_540&sid=JCn330xSXpDUtieRguQzRx0q5D2azRNty2G69TqK&secret=a8bf52caed9a7411a14c3dbcaf4f70b4&time=1742501441", logo: "https://via.placeholder.com/120x80.png?text=SPOTV2" },
+            { name: "SPOTV Prime", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=spotv_prime_540&sid=V1R87ydx8jeZbnselXMKDBx9IPKMXNa5Zv7Iqv31&secret=79ee49d5533da8320bdd61ec92cd4ded&time=1742501589", logo: "https://via.placeholder.com/120x80.png?text=SPOTV+Prime" },
+            { name: "SPOTV On", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=spotv_on_540&sid=khuvDUGA5oq5SVN9qUTdlNpFKsr85NI7poL0OHU7&secret=4b9ae05ec416ae0275d3cee4511e7f7b&time=1742501659", logo: "https://via.placeholder.com/120x80.png?text=SPOTV+On" },
+            { name: "BilliardsTV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=billiardstv_540&sid=dhbSSmqXjzcAIi6TV9nwpPQYU97Q5dFXLAFrT4EA&secret=7b49ace0e217934036273cc10a61f817&time=1742501837", logo: "https://via.placeholder.com/120x80.png?text=BilliardsTV" },
+            { name: "IB SPORTS", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=jtbc_3_540&sid=Apn7LTiUje3L7FmQObTgYnKBNeDUDytdiUSkqYw1&secret=7e6facc78d8f68a85388b1945d966a04&time=1742501522", logo: "https://via.placeholder.com/120x80.png?text=IB+SPORTS" },
+            { name: "SKY SPORTS F1", url: "http://fortv.cc:8080/clarencekingrh@hotmail.com/pKgSdl4ZFX/35244", logo: "https://via.placeholder.com/120x80.png?text=SKY+SPORTS+F1" },
+            { name: "OGN starleague", url: "https://jmp2.uk/stvp-KRBC3200005SH", logo: "https://via.placeholder.com/120x80.png?text=OGN+starleague" },
+            { name: "MNet", url: "http://warlock0.synology.me:9999/klive/api/url.m3u8?m=url&s=tving&i=C00579&q=FHD&apikey=5MY50EII66", logo: "https://via.placeholder.com/120x80.png?text=MNet" },
+            { name: "tvN Show", url: "http://warlock0.synology.me:9999/klive/api/url.m3u8?m=url&s=tving&i=C01141&q=FHD&apikey=5MY50EII66", logo: "https://via.placeholder.com/120x80.png?text=tvN+Show" },
+            { name: "ENA", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs_joy_540&sid=tLqu4O06OBUd42Bf6pQzEj5iFGeblET7JuLcQfc7&secret=9b1bada69fe289f71ac1e24e8376b857&time=1742501919", logo: "https://via.placeholder.com/120x80.png?text=ENA" },
+            { name: "MBC every1", url: "https://tistory1.daumcdn.net/tistory/2864485/skin/images/CATV_223_D2C739D6.m3u8", logo: "https://via.placeholder.com/120x80.png?text=MBC+every1" },
+            { name: "SBS Plus", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=sbs_plus_540&sid=syCIAWw5LA5R9EkVZhUAQgU7aMIoy8ojVwul0T1b&secret=406c160188ee60dacd0829b4d801fc2e&time=1742560026", logo: "https://via.placeholder.com/120x80.png?text=SBS+Plus" },
+            { name: "Channel E", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=channel_e_540&sid=y8c3beG6YJJDp9UMDq1kKSrl1NC0wY4mjXGAlZP6&secret=9ae1c63d7157e00c9298122b44e8e081&time=1742560086", logo: "https://via.placeholder.com/120x80.png?text=Channel+E" },
+            { name: "tvN STORY", url: "https://jmp2.uk/stvp-KRBC3200014XZ", logo: "https://via.placeholder.com/120x80.png?text=tvN+STORY" },
+            { name: "tvN DRAMA", url: "http://warlock0.synology.me:9999/klive/api/url.m3u8?m=url&s=tving&i=C01143&q=FHD&apikey=5MY50EII66", logo: "https://via.placeholder.com/120x80.png?text=tvN+DRAMA" },
+            { name: "KBS Drama", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs_drama_540&sid=q3B5WSCH4URY8GiHOmAi4YrNVPWKot9vVlo9Vif3&secret=af52b1a2db7f1a11eee422a86931dfa4&time=1742559860", logo: "https://via.placeholder.com/120x80.png?text=KBS+Drama" },
+            { name: "코메디TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=comedy_540&sid=VwrbOrArABoCGtqRD7p4O5o3TLyqonOhScABtAo7&secret=2fe9f41d49ae8ea23b419e850b69671d&time=1742501996", logo: "https://via.placeholder.com/120x80.png?text=코메디TV" },
+            { name: "MBC On", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=mbc_on_540&sid=1n0TiOLYplMhPQUiUnKKf3j1UuULzQWKwPSDBrkt&secret=0a8915eba29dd2179cd38d8f7fb004ba&time=1742502620", logo: "https://via.placeholder.com/120x80.png?text=MBC+On" },
+            { name: "중화TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=chinesetv_540&sid=ZhoPSyCssGAH4bZqbgtiLGY2RRNtZkpxdNaqJ59Z&secret=d61b57728a4807c259df2dad974b8d5b&time=1742555489", logo: "https://via.placeholder.com/120x80.png?text=중화TV" },
+            { name: "바둑TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=baduk_540&sid=BUdcXyBWIi9dQgC9QbarQyw1r2Punh3ScBDyvPkx&secret=46f15e2f7aa89b944adadb345e1d66af&time=1742555602", logo: "https://via.placeholder.com/120x80.png?text=바둑TV" },
+            { name: "브레인TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=brain_tv_540&sid=pXLsKDVuSzSlCPzDBtZ3Tjp06jRx0Cjb6hMFnxt4&secret=1f34a19c2968298e793fc294a26ec99c&time=1742555675", logo: "https://via.placeholder.com/120x80.png?text=브레인TV" },
+            { name: "FTV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=ftv_540&sid=bZKhHcxaPkJGE3mmH8UPN66ooPuufcWyGBuvtjTO&secret=5d91e5de24f5cb3123ee6e659939bdb5&time=1742555798", logo: "https://via.placeholder.com/120x80.png?text=FTV" },
+            { name: "네셔날지오그래피", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=national_540&sid=Frw4dKWvqJLBjvHgByjOVO1M8zkSD6LjvUABHvLS&secret=5c8e0f0753609c3db02f0a5a0786ccd1&time=1742555875", logo: "https://via.placeholder.com/120x80.png?text=네셔날지오그래피" },
+            { name: "디스커버리", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=discovery_540&sid=2iObz48WCFCkHcuaQTRez5kpeHPfdHYiOE1icCKS&secret=660b5a2059948553effae93e4def6d04&time=1742555991", logo: "https://via.placeholder.com/120x80.png?text=디스커버리" },
+            { name: "Nat Geo Wild", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=nat_geo_wild_540&sid=0wJqyjtLKS6wxrUnZ6cnaRHDVz6ztklaA1tOzALv&secret=8a3bcec4a32f89003264607c049a2ce3&time=1742556081", logo: "https://via.placeholder.com/120x80.png?text=Nat+Geo+Wild" },
+            { name: "History", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=history_540&sid=ktDYnxAlcjz7V3RTfpIGFtr5pGjLTXXbuEqQQTjG&secret=fa393d7a7f8b5c570fa9a02d67e5ddb8&time=1742556221", logo: "https://via.placeholder.com/120x80.png?text=History" },
+            { name: "iNET", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=inet_540&sid=OPbFOFpoTQ729gz3U05zWdlE920QJze3POZPfHuO&secret=5121ac51f8f56d26f013a0db2cbe06e9&time=1742556350", logo: "https://via.placeholder.com/120x80.png?text=iNET" },
+            { name: "JEI 재능TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=jei_jenung_540&sid=5x1n6FyzRQMkri2LhZ71Mjao59LSpdVKNNnvDkJW&secret=1fd8004ee3d2c119d064ec88b38d97b3&time=1742556811", logo: "https://via.placeholder.com/120x80.png?text=JEI+재능TV" },
+            { name: "육아방송", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=child_care_540&sid=MCMbs5pnRCoyIVAPtv5g0MRDu11MEoQNUSSpZfsk&secret=706abe245cd1b8483e082c3ee34c19b3&time=1742556877", logo: "https://via.placeholder.com/120x80.png?text=육아방송" },
+            { name: "뽀요 TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=disney_channel_540&sid=f6coDFH9FZGv5Tl9FZinkVetugwWFq3RjSfNJIWl&secret=c0c2de490583ac54b9710cc8ac2a8636&time=1742556938", logo: "https://via.placeholder.com/120x80.png?text=뽀요+TV" },
+            { name: "KBS kids", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=kbs_kids_540&sid=6GIrIVmGxADvFwNcDZn2ZKO972L101Y0O54pvVUu&secret=e5d3211063e265afd0cd9f542d9d3de2&time=1742557009", logo: "https://via.placeholder.com/120x80.png?text=KBS+kids" },
+            { name: "Toonivers", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=tooniverse_540&sid=eCxHR168RlUUkQqYOIWVyWfIUxPu06nBlSxHIO46&secret=96b99d3a3fdfca5375de61e8c24350b4&time=1742557506", logo: "https://via.placeholder.com/120x80.png?text=Toonivers" },
+            { name: "Cartoon", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=cartoon_network_540&sid=RyguKlLteLqv9rk0RS2MXuF7i1rMwPylYuihkE8h&secret=285476c7f0a52c71c066532526326dde&time=1742558094", logo: "https://via.placeholder.com/120x80.png?text=Cartoon" },
+            { name: "어린이TV", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=childrens_tv_540&sid=bacS5e2f2oSXK0Jq8h8erviPliIz00vJqZSDx7AV&secret=e37983794947e47b83649a92de60f3da&time=1742558216", logo: "https://via.placeholder.com/120x80.png?text=어린이TV" },
+            { name: "ANIPLUS", url: "http://warlock0.synology.me:9999/klive/api/url.m3u8?m=url&s=tving&i=C00901&q=FHD&apikey=5MY50EII66", logo: "https://via.placeholder.com/120x80.png?text=ANIPLUS" },
+            { name: "CNN", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=cnn_kr_540&sid=7ySL8aoIyy2NPbS1ENkvzkgj9C3GvJq2bdQ7PneQ&secret=0477f93d5d7e29a87ad3482bd1ecf100&time=1742558366", logo: "https://via.placeholder.com/120x80.png?text=CNN" },
+            { name: "BBC", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=bbc_kr_540&sid=NvDfJvaZ3zU7NbrHR43AaUgWJK2zdoOc8KCQzTll&secret=aa2b347766700a37e0d86da63886687d&time=1742558446", logo: "https://via.placeholder.com/120x80.png?text=BBC" },
+            { name: "NHK World", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=nhk_wold_540&sid=VQ5jdk6wCPjw6VcPfOv76Syot6CoP9YgzBLFeHjZ&secret=a86dad9133b53ffc834fe98b63c98919&time=1742558568", logo: "https://via.placeholder.com/120x80.png?text=NHK+World" },
+            { name: "TV조선", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=tvchosun_540&sid=fKZsnPIjdoVZrjIWsqL5dPcQwba75T2ANFPAQIih&secret=18d00e092d1f8fa5a6107f0328ff4972&time=1742500050", logo: "https://via.placeholder.com/120x80.png?text=TV조선" },
+            { name: "채널A", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=channela_540&sid=zLhHxUtd4yz2toiohNMEfx63yhemDSOd2xgsFaBV&secret=ad760dc9b77c911e341d5e114e36feff&time=1742500133", logo: "https://via.placeholder.com/120x80.png?text=채널A" },
+            { name: "MBN", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=mbn_540&sid=JrgTsnJKQo0TU9yiyoZf7eA9llHJEMpTQlgyggsJ&secret=68b0e61613ec8fda51fd248052b6aa69&time=1742500229", logo: "https://via.placeholder.com/120x80.png?text=MBN" },
+            { name: "한국경제", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=wowtv_540&sid=78aYN4ktf0r1dt55tnyXZwly6i1geE6psoDdZvce&secret=d1de772e9eeb5dcf1636c239f633cdb2&time=1742500679", logo: "https://via.placeholder.com/120x80.png?text=한국경제" },
+            { name: "현대홈쇼핑", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=hyundaih_mall_540&sid=kRIZglDoTkTX95OSEfXY5VUZFpfFq6cVReRRuWSR&secret=fb19ea96320fbea13ea32914018bf9af&time=1742560145", logo: "https://via.placeholder.com/120x80.png?text=현대홈쇼핑" }
+        ];
+
+        function playChannel(url, targetLogo) {
+            if (Hls.isSupported()) {
+                hls.destroy();
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    video.play();
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', function () {
+                    video.play();
+                });
+            }
+            
+            document.querySelectorAll('.logo').forEach(logo => logo.classList.remove('playing-logo'));
+            targetLogo.classList.add('playing-logo');
+        }
+
+        channels.forEach(channel => {
+            const img = document.createElement('img');
+            img.src = channel.logo;
+            img.title = channel.name;
+            img.className = 'logo';
+            img.addEventListener('click', () => playChannel(channel.url, img));
+            logoGrid.appendChild(img);
+        });
+
+        // Auto-play the first channel
+        if (channels.length > 0) {
+            const firstLogo = logoGrid.firstChild;
+            playChannel(channels[0].url, firstLogo);
+        }
+    </script>
+</body>
+</html>
