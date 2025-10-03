@@ -87,10 +87,23 @@ def get_local_ip():
 def open_browser(url, delay=1.5):
     """Open URL in default browser after a delay"""
     time.sleep(delay)
+
+    # Suppress stderr to avoid gio/xdg-open errors on some Linux/WSL systems
+    import subprocess
+    old_stderr = os.dup(2)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+
     try:
+        os.dup2(devnull, 2)
         webbrowser.open(url)
+        os.dup2(old_stderr, 2)
+        os.close(devnull)
+        os.close(old_stderr)
         print_colored(f"✅ Opening browser at {url}", Colors.GREEN)
     except:
+        os.dup2(old_stderr, 2)
+        os.close(devnull)
+        os.close(old_stderr)
         print_colored(f"⚠️  Could not open browser automatically", Colors.YELLOW)
         print_colored(f"Please open manually: {url}", Colors.YELLOW)
 

@@ -97,7 +97,7 @@ python start.py
 
 #### 🎯 Features of Startup Scripts
 - ✅ Automatically finds an available port (default: 8000)
-- ✅ Opens your default browser automatically
+- ✅ Opens your default browser automatically (with clean output on WSL/Linux)
 - ✅ Works with Python 3, Python 2, PHP, or Node.js
 - ✅ Shows both local and network URLs for easy access
 - ✅ Cross-platform support (Windows, Linux, Mac)
@@ -168,7 +168,12 @@ The player has been optimized for maximum performance:
 
 ## **📝 Version History**
 
-### Version 2.0 (Latest)
+### Version 2.0.1 (Latest - 2025-10-03)
+- 🐛 Fixed WSL/Linux browser launch errors in startup script
+- 🎨 Added favicon to eliminate browser 404 errors
+- 🧹 Cleaner server logs without unnecessary warnings
+
+### Version 2.0 (2025-10-03)
 - ✨ Modern UI with gradient design
 - 🔍 Added search functionality
 - 🏷️ Category filtering system

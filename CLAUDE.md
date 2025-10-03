@@ -71,6 +71,13 @@ Korean Live TV streaming player - a modern, high-performance HTML5 single-page a
 - Entertainment: Mint-pink gradient (#a8edea → #fed6e3)
 - Kids: Peach gradient (#ffecd2 → #fcb69f)
 
+#### 5. Favicon (line 41)
+
+**SVG Data URI Favicon:**
+- Embedded 📺 emoji as SVG data URI
+- Zero external requests
+- Eliminates browser 404 errors for favicon.ico
+
 ## Development Commands
 
 ### Local Server (Recommended)
@@ -92,7 +99,7 @@ python3 start.py [port]
 
 **Features:**
 - Auto port detection (default: 8000)
-- Auto-launch browser
+- Auto-launch browser with suppressed stderr (no gio errors on WSL/Linux)
 - Works with Python 3/2, PHP, or Node.js
 - Shows local + network URLs
 
@@ -188,7 +195,12 @@ Edit the `channels` array in player.html (lines 363-445):
 
 ## Version History
 
-### v2.0 (Current - 2025-10-03)
+### v2.0.1 (2025-10-03)
+- Fixed: Suppressed gio/xdg-open stderr output in start.py for WSL/Linux environments
+- Added: SVG data URI favicon to eliminate browser 404 errors
+- Improved: Cleaner server logs without unnecessary error messages
+
+### v2.0 (2025-10-03)
 - Pure CSS gradient buttons
 - Real-time search functionality
 - Category filtering system
