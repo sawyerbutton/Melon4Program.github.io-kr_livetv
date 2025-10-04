@@ -80,9 +80,34 @@ Korean Live TV streaming player - a modern, high-performance HTML5 single-page a
 - Zero external requests
 - Eliminates browser 404 errors for favicon.ico
 
-#### 6. EPG (Electronic Program Guide) System
+#### 6. EPG (Electronic Program Guide) System Architecture
 
-**Phase 1: Static Data Implementation (Current - v2.1)**
+**Overview**: Three-phase implementation with progressive enhancement
+
+**Data Flow**:
+```
+Browser Load
+    ↓
+EPGDataManager.initializeEPG() (async IIFE)
+    ↓
+Try: fetchLiveXMLTV() from EPGSHARE01
+    ├─ Success → Parse gzipped XMLTV (pako.js)
+    │           → Map channel IDs (CHANNEL_ID_MAPPING)
+    │           → Filter 24h window (2h ago → 26h ahead)
+    │           → Cache to LocalStorage (kr_livetv_epg_cache_live)
+    │           → Update epgDataSource
+    └─ Failure → Load from LocalStorage cache
+                 → Fallback to static data
+    ↓
+renderChannels()
+    └─ createEPGTooltip(channelName)
+        └─ EPGTimeMatcher.getCurrentAndNext(programs)
+            ├─ Parse times to Beijing timezone (UTC+8)
+            ├─ Find exact match for NOW
+            └─ Find upcoming program for NEXT
+```
+
+**Phase 1: Static Data Implementation (v2.1)**
 
 **CSS Tooltip Styles (lines 312-426)**
 - Gradient tooltip with backdrop blur effect
@@ -230,10 +255,29 @@ python3 start.py [port]
 - Works with Python 3/2, PHP, or Node.js
 - Shows local + network URLs
 
+### Testing
+
+**Run EPG logic tests (no browser required):**
+```bash
+node test_epg_simple.js
+```
+
+Tests EPG time matching logic, validates NOW/NEXT program selection, and checks for timezone bugs. Exit code 0 = pass, 1 = fail.
+
+**Run E2E tests (requires Puppeteer):**
+```bash
+npm install  # First time only
+node test_epg.js
+```
+
+Automated browser testing of EPG tooltips and time display.
+
 ### Direct Development
 - Simply open `player.html` in browser
 - No compilation or build step needed
 - Changes are immediately visible on refresh
+- **Hard refresh** (Ctrl+Shift+R / Cmd+Shift+R) to clear browser cache
+- Clear LocalStorage (F12 → Application → Local Storage → Clear) for EPG cache reset
 
 ### Adding/Modifying Channels
 
@@ -287,15 +331,17 @@ Edit the `channels` array in player.html (lines 363-445):
 ## File Structure
 
 ```
-├── player.html                   # Main application (self-contained)
-├── start.sh                      # Linux/Mac server launcher
-├── start.bat                     # Windows server launcher
-├── start.py                      # Cross-platform Python server
-├── README.md                     # English documentation
-├── README_zh.md                  # Chinese documentation
-├── CLAUDE.md                     # This file
-├── EPG_DATA_SOURCE_RESEARCH.md   # Korean EPG data source research (Phase 2.5)
-└── LICENSE                       # MIT License
+├── player.html                   # Main application (self-contained, ~75KB)
+├── start.sh / start.bat / start.py  # Development server launchers
+├── test_epg_simple.js            # EPG logic tests (Node.js, no browser)
+├── test_epg.js                   # E2E tests (Puppeteer)
+├── package.json                  # Test dependencies (puppeteer)
+├── README.md / README_zh.md      # User documentation
+├── CLAUDE.md                     # This file (AI development guide)
+├── EPG_DATA_SOURCE_RESEARCH.md   # EPG data source research report
+├── LICENSE                       # MIT License
+├── .gitignore                    # Git ignore rules
+└── node_modules/                 # Dependencies (ignored by git)
 ```
 
 ## Common Development Patterns
@@ -337,14 +383,29 @@ Tooltip will automatically display on hover. Use bilingual titles (Korean/Chines
 Browser console commands:
 ```javascript
 // Check EPG data loaded
-console.log(epgData);
+console.log(epgDataSource);
+
+// Check which cache is being used
+console.log('Live cache:', localStorage.getItem('kr_livetv_epg_cache_live') ? 'exists' : 'missing');
+console.log('Static cache:', localStorage.getItem('kr_livetv_epg_cache') ? 'exists' : 'missing');
 
 // Count tooltips rendered
 console.log(document.querySelectorAll('.epg-tooltip').length);
 
 // Inspect first channel tooltip
 console.log(document.querySelector('.channel-btn').innerHTML);
+
+// Test time matching for a specific channel
+const programs = epgDataSource['KBS2'];
+const { now, next } = EPGTimeMatcher.getCurrentAndNext(programs);
+console.log('NOW:', now, 'NEXT:', next);
 ```
+
+**Common EPG Issues:**
+- **21:00 shown as NOW in morning**: Fallback logic showing outdated program - should only show NEXT
+- **Time mismatch**: Verify Beijing timezone conversion in `parseTime()` and `getCurrentAndNext()`
+- **Empty tooltips**: Check LocalStorage quota, clear cache if needed
+- **403 stream errors**: M3U8 URLs expired (unrelated to EPG, URLs have time-limited tokens)
 
 ## Version History
 
@@ -412,13 +473,28 @@ console.log(document.querySelector('.channel-btn').innerHTML);
 - Basic channel grid with placeholder images
 - Simple HLS.js integration
 
-## Important Limitations
+## Important Limitations & Known Issues
 
-1. **Stream URLs**: Often expire due to time-limited tokens
-2. **CORS**: Streams must enable cross-origin access
-3. **External APIs**: Some channels depend on third-party proxies
-4. **Region locks**: Some streams may be geo-restricted
-5. **No persistence**: Channel list is hardcoded (by design for simplicity)
+1. **Stream URLs expire**: Often contain time-limited tokens (hours to days)
+   - Check URL timestamp: `new Date(1742499579 * 1000)` to verify age
+   - 403 Forbidden errors indicate expired URLs, not code bugs
+   - URLs must be manually updated in `channels` array (lines 488-550)
+
+2. **CORS requirements**: Streams must enable cross-origin access
+   - Test in browser DevTools Network tab
+   - Some streams may be region-restricted
+
+3. **External API dependencies**:
+   - warlock0.synology.me, jmp2.uk, myjktv.com may have availability issues
+   - No control over third-party proxy uptime
+
+4. **EPG data coverage**:
+   - Live XMLTV: ~75% channel coverage (20+ mapped channels)
+   - Static fallback: Limited to 9 major channels
+   - Unmapped channels show "No program data available"
+
+5. **No persistence**: Channel list hardcoded by design for simplicity
+   - Single-file architecture prioritizes portability over features
 
 ## Bilingual Support
 
@@ -449,3 +525,19 @@ When testing changes:
 - Use descriptive commit messages following conventional commits format
 - Include Claude Code attribution footer in commits
 - Update version number in both `player.html` header and `CLAUDE.md`
+
+### EPG Development Workflow
+When modifying EPG system:
+1. **Make changes** to `player.html` EPG-related code
+2. **Run tests**: `node test_epg_simple.js` for quick validation
+3. **If tests pass**: Commit changes
+4. **If tests fail**: Fix issues until tests pass
+5. **Browser testing**: Hard refresh + clear LocalStorage to test live
+6. **Common pitfall**: Don't show outdated programs as NOW - only exact matches or NEXT
+
+Key EPG principles:
+- All time matching uses **Beijing timezone** (UTC+8) for Chinese users
+- Korean programs (UTC+9) display 1 hour earlier in Beijing time
+- NOW badge: Only for exact time matches
+- NEXT badge: Upcoming programs when NOW unavailable
+- Display "⏳ 当前节目信息暂无" if no NOW but have NEXT
