@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Korean Live TV streaming player - a modern, high-performance HTML5 single-page application for watching 70+ Korean TV channels using HLS (HTTP Live Streaming) technology. Version 2.1 features pure CSS buttons, real-time search, category filtering, EPG (Electronic Program Guide) tooltips, and optimized performance.
 
+**Single-file architecture** - All HTML, CSS, and JavaScript in `player.html` for maximum simplicity and portability.
+
 ## Architecture
 
 ### Single-File Application
@@ -234,6 +236,17 @@ Edit the `channels` array in player.html (lines 363-445):
 
 ## Common Development Patterns
 
+### Adding EPG Data for New Channels
+
+Edit `epgData` object (lines 568-621):
+```javascript
+"NewChannelName": [
+  { time: "09:00-10:00", title: "节目名称", desc: "节目描述" },
+  { time: "10:00-11:00", title: "下一节目", desc: "描述" }
+]
+```
+Tooltip will automatically display on hover. Use bilingual titles (Korean/Chinese) for consistency.
+
 ### Adding a New Category
 
 1. Add category button in HTML (line ~334-340)
@@ -254,6 +267,20 @@ Edit the `channels` array in player.html (lines 363-445):
 3. Check Network tab for M3U8 request failures
 4. Verify CORS headers on stream URLs
 5. Test URL directly in VLC or other M3U8 player
+
+### Testing EPG Tooltips
+
+Browser console commands:
+```javascript
+// Check EPG data loaded
+console.log(epgData);
+
+// Count tooltips rendered
+console.log(document.querySelectorAll('.epg-tooltip').length);
+
+// Inspect first channel tooltip
+console.log(document.querySelector('.channel-btn').innerHTML);
+```
 
 ## Version History
 
@@ -299,3 +326,26 @@ Edit the `channels` array in player.html (lines 363-445):
 - Search placeholder: "🔍 搜索频道... / Search channels..."
 - Category buttons: "全部 All", "主流 Major", etc.
 - Error messages: Bilingual format
+
+## Development Workflow Best Practices
+
+### Browser Cache Issues
+When testing changes:
+- Use **hard refresh**: `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac)
+- Or use **incognito/private mode** for clean testing
+- HTTP 304 responses indicate cached content
+
+### CSS Changes
+- `.channel-btn` uses `overflow: visible` for EPG tooltip display
+- Modifying overflow may break tooltip positioning
+- Test hover states after CSS changes
+
+### Adding Channels
+- Verify M3U8 URL works in VLC/mpv before adding
+- URLs with tokens expire - document expiration if known
+- Test CORS headers using browser DevTools Network tab
+
+### Git Workflow
+- Use descriptive commit messages following conventional commits format
+- Include Claude Code attribution footer in commits
+- Update version number in both `player.html` header and `CLAUDE.md`
