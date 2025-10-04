@@ -764,9 +764,30 @@
 
             /**
              * Load EPG data from LocalStorage cache
+             * Prioritizes live XMLTV cache over static cache
              * @returns {Object|null} Cached data or null if expired/missing
              */
             static loadFromCache() {
+                // Try live cache first (EPGSHARE01)
+                try {
+                    const liveCached = localStorage.getItem(this.CACHE_KEY_LIVE);
+                    if (liveCached) {
+                        const { data, timestamp } = JSON.parse(liveCached);
+                        const age = Date.now() - timestamp;
+
+                        if (age < this.CACHE_DURATION) {
+                            console.log(`✅ Loaded live EPG from cache (${(age / 1000 / 60).toFixed(0)}min old)`);
+                            return { data, age };
+                        } else {
+                            console.log('⏰ Live EPG cache expired');
+                            localStorage.removeItem(this.CACHE_KEY_LIVE);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading live EPG cache:', error);
+                }
+
+                // Fallback to static cache
                 try {
                     const cached = localStorage.getItem(this.CACHE_KEY);
                     if (!cached) return null;
@@ -774,35 +795,76 @@
                     const { data, timestamp } = JSON.parse(cached);
                     const age = Date.now() - timestamp;
 
-                    // Check if cache is still valid
                     if (age < this.CACHE_DURATION) {
+                        console.log(`📊 Loaded static EPG from cache (${(age / 1000 / 60).toFixed(0)}min old)`);
                         return { data, age };
                     } else {
-                        console.log('⏰ EPG cache expired, clearing...');
+                        console.log('⏰ Static EPG cache expired');
                         this.clearCache();
                         return null;
                     }
                 } catch (error) {
-                    console.error('Error loading EPG cache:', error);
+                    console.error('Error loading static EPG cache:', error);
                     return null;
                 }
             }
 
             /**
-             * Save EPG data to LocalStorage cache
+             * Save EPG data to LocalStorage cache with quota handling
              * @param {Object} data - EPG data to cache
+             * @param {string} cacheKey - Cache key to use (optional)
              */
-            static saveToCache(data) {
+            static saveToCache(data, cacheKey = this.CACHE_KEY) {
                 try {
                     const cacheObject = {
                         data,
                         timestamp: Date.now()
                     };
-                    localStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheObject));
-                    console.log('💾 EPG data cached successfully');
+                    const jsonString = JSON.stringify(cacheObject);
+                    const sizeKB = (jsonString.length / 1024).toFixed(2);
+
+                    localStorage.setItem(cacheKey, jsonString);
+                    console.log(`💾 EPG cached successfully (${sizeKB} KB)`);
                 } catch (error) {
-                    console.error('Error saving EPG cache:', error);
+                    if (error.name === 'QuotaExceededError') {
+                        console.warn('⚠️ LocalStorage quota exceeded, clearing old cache...');
+
+                        // Clear all EPG caches to free up space
+                        localStorage.removeItem(this.CACHE_KEY);
+                        localStorage.removeItem(this.CACHE_KEY_LIVE);
+
+                        // Try saving again with smaller dataset (only current channel data)
+                        try {
+                            const reducedData = this.reduceDataSize(data);
+                            const reducedJson = JSON.stringify({ data: reducedData, timestamp: Date.now() });
+                            localStorage.setItem(cacheKey, reducedJson);
+                            console.log(`💾 Saved reduced EPG cache (${(reducedJson.length / 1024).toFixed(2)} KB)`);
+                        } catch (retryError) {
+                            console.warn('❌ Unable to cache EPG data, will use live data only');
+                        }
+                    } else {
+                        console.error('Error saving EPG cache:', error);
+                    }
                 }
+            }
+
+            /**
+             * Reduce EPG data size by keeping only essential fields
+             * @param {Object} data - Full EPG data
+             * @returns {Object} Reduced EPG data
+             */
+            static reduceDataSize(data) {
+                const reduced = {};
+                for (const [channel, programs] of Object.entries(data)) {
+                    // Only keep first 5 programs per channel
+                    reduced[channel] = programs.slice(0, 5).map(prog => ({
+                        start: prog.start,
+                        stop: prog.stop,
+                        title: prog.title,
+                        // Remove desc and category to save space
+                    }));
+                }
+                return reduced;
             }
 
             /**
@@ -856,16 +918,11 @@
                     const parsed = XMLTVParser.parse(xmlText);
                     console.log(`📺 Found ${parsed.channels.size} channels, ${parsed.programmes.length} programmes`);
 
-                    // 6. Convert to our format with channel mapping
+                    // 6. Convert to our format with channel mapping (filtered for 24h window)
                     const epgData = this.convertParsedToEPGDataWithMapping(parsed);
 
-                    // 7. Save to cache
-                    this.saveToCache(epgData);
-                    localStorage.setItem(this.CACHE_KEY_LIVE, JSON.stringify({
-                        data: epgData,
-                        timestamp: Date.now(),
-                        source: 'EPGSHARE01'
-                    }));
+                    // 7. Save to cache (with quota handling)
+                    this.saveToCache(epgData, this.CACHE_KEY_LIVE);
 
                     return epgData;
                 } catch (error) {
@@ -925,13 +982,30 @@
             }
 
             /**
+             * Filter programmes to only include current + next 24 hours
+             * @param {Date} programStart - Program start time
+             * @param {Date} programStop - Program stop time
+             * @returns {boolean} True if program is within time window
+             */
+            static isProgramRelevant(programStart, programStop) {
+                const now = new Date();
+                const windowStart = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2 hours ago
+                const windowEnd = new Date(now.getTime() + 26 * 60 * 60 * 1000);   // 26 hours ahead
+
+                return programStop >= windowStart && programStart <= windowEnd;
+            }
+
+            /**
              * Convert parsed XMLTV data to our EPG format using channel ID mapping
+             * Optimized: Only stores current + next 24 hours to reduce LocalStorage usage
              * @param {Object} parsed - Parsed XMLTV data
              * @returns {Object} EPG data in our format with mapped channel names
              */
             static convertParsedToEPGDataWithMapping(parsed) {
                 const epgData = {};
                 const unmappedChannels = new Set();
+                let totalPrograms = 0;
+                let filteredPrograms = 0;
 
                 // Create reverse mapping: XMLTV ID → Project Channel Name
                 const reverseMapping = {};
@@ -940,6 +1014,14 @@
                 }
 
                 parsed.programmes.forEach(prog => {
+                    totalPrograms++;
+
+                    // Filter: Only include programs within time window (current + next 24h)
+                    if (!this.isProgramRelevant(prog.start, prog.stop)) {
+                        return; // Skip programs outside time window
+                    }
+                    filteredPrograms++;
+
                     const channel = parsed.channels.get(prog.channelId);
                     if (!channel) return;
 
@@ -971,6 +1053,7 @@
                 }
 
                 console.log(`✅ Mapped EPG data for ${Object.keys(epgData).length} channels`);
+                console.log(`📊 Filtered ${filteredPrograms} / ${totalPrograms} programs (24h window)`);
                 return epgData;
             }
 
