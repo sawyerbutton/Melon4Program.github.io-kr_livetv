@@ -1200,6 +1200,7 @@
                 // Find current program
                 let currentProgram = null;
                 let nextProgram = null;
+                let lastProgramBeforeNow = null;
 
                 for (let i = 0; i < sortedPrograms.length; i++) {
                     const program = sortedPrograms[i];
@@ -1217,16 +1218,36 @@
                         break;
                     }
 
-                    // If we passed the current time, this is the next program
+                    // Track programs before current time
+                    if (stopMinutes <= nowMinutes || (stopMinutes < startMinutes && adjustedStop <= adjustedNow)) {
+                        lastProgramBeforeNow = program;
+                    }
+
+                    // Find next program (first program after current time)
                     if (startMinutes > nowMinutes && !nextProgram) {
                         nextProgram = program;
                     }
                 }
 
-                // If no current program found, use last program as current and first as next
+                // Fallback: If no exact match found, show most recent past program as NOW
                 if (!currentProgram && sortedPrograms.length > 0) {
-                    currentProgram = sortedPrograms[sortedPrograms.length - 1];
-                    nextProgram = sortedPrograms[0];
+                    // If we have a program that ended recently, show it as "recently ended"
+                    // Otherwise, if all programs are in the future, show first upcoming as NEXT only
+                    if (lastProgramBeforeNow) {
+                        currentProgram = lastProgramBeforeNow;
+                        if (!nextProgram) {
+                            // Find first program after lastProgramBeforeNow
+                            const lastIndex = sortedPrograms.indexOf(lastProgramBeforeNow);
+                            nextProgram = sortedPrograms[lastIndex + 1] || sortedPrograms[0];
+                        }
+                    } else if (nextProgram) {
+                        // All programs are in the future, only show NEXT
+                        currentProgram = null;
+                    } else {
+                        // All programs are in the past, show last as recently ended
+                        currentProgram = sortedPrograms[sortedPrograms.length - 1];
+                        nextProgram = sortedPrograms[0]; // Loop to first
+                    }
                 }
 
                 return { now: currentProgram, next: nextProgram };

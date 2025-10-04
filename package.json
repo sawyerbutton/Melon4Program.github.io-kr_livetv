@@ -1,0 +1,11 @@
+{
+  "name": "kr-livetv-epg-test",
+  "version": "1.0.0",
+  "description": "E2E tests for Korean Live TV EPG system",
+  "scripts": {
+    "test:epg": "node test_epg.js"
+  },
+  "devDependencies": {
+    "puppeteer": "^21.0.0"
+  }
+}
