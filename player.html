@@ -1134,13 +1134,23 @@
          */
         class EPGTimeMatcher {
             /**
-             * Parse time string to minutes since midnight
+             * Parse time string to minutes since midnight (Beijing timezone)
              * @param {string} timeStr - Time in format "HH:MM" or Date object
-             * @returns {number} Minutes since midnight
+             * @returns {number} Minutes since midnight in Beijing time
              */
             static parseTime(timeStr) {
                 if (timeStr instanceof Date) {
-                    return timeStr.getHours() * 60 + timeStr.getMinutes();
+                    // Convert Date object to Beijing time
+                    const beijingHour = parseInt(timeStr.toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        hour: '2-digit',
+                        hour12: false
+                    }));
+                    const beijingMinute = parseInt(timeStr.toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        minute: '2-digit'
+                    }));
+                    return beijingHour * 60 + beijingMinute;
                 }
                 const [hours, minutes] = timeStr.split(':').map(Number);
                 return hours * 60 + minutes;
@@ -1158,7 +1168,7 @@
             }
 
             /**
-             * Get current and next programs for a channel
+             * Get current and next programs for a channel (using Beijing timezone)
              * @param {Array} channelPrograms - Array of program objects
              * @param {Date} currentTime - Current time (optional, defaults to now)
              * @returns {Object} { now: program, next: program }
@@ -1168,7 +1178,17 @@
                     return { now: null, next: null };
                 }
 
-                const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+                // Get current Beijing time in minutes since midnight
+                const beijingHour = parseInt(currentTime.toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    hour: '2-digit',
+                    hour12: false
+                }));
+                const beijingMinute = parseInt(currentTime.toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    minute: '2-digit'
+                }));
+                const nowMinutes = beijingHour * 60 + beijingMinute;
 
                 // Sort programs by start time
                 const sortedPrograms = [...channelPrograms].sort((a, b) => {
