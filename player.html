@@ -1213,17 +1213,28 @@
             }
 
             /**
-             * Format program time range for display
+             * Format program time range for display in Beijing time (UTC+8)
              * @param {Object} program - Program object with start/stop
-             * @returns {string} Formatted time range "HH:MM-HH:MM"
+             * @returns {string} Formatted time range "HH:MM-HH:MM (北京时间)"
              */
             static formatProgramTime(program) {
                 if (!program) return '';
 
                 if (program.start instanceof Date && program.stop instanceof Date) {
-                    const startStr = this.formatTime(program.start.getHours() * 60 + program.start.getMinutes());
-                    const stopStr = this.formatTime(program.stop.getHours() * 60 + program.stop.getMinutes());
-                    return `${startStr}-${stopStr}`;
+                    // Convert to Beijing time (Asia/Shanghai = UTC+8)
+                    const startBeijing = program.start.toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                    const stopBeijing = program.stop.toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                    return `${startBeijing}-${stopBeijing}`;
                 }
 
                 return `${program.start}-${program.stop}`;
