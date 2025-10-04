@@ -564,63 +564,408 @@
             { name: "현대홈쇼핑", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=hyundaih_mall_540&sid=kRIZglDoTkTX95OSEfXY5VUZFpfFq6cVReRRuWSR&secret=fb19ea96320fbea13ea32914018bf9af&time=1742560145", category: "entertainment" }
         ];
 
-        // ===== EPG DATA (Electronic Program Guide) =====
-        // Static program schedule data for demonstration
-        // Format: { "ChannelName": [{ time, title, desc }, ...] }
-        const epgData = {
-            "KBS1": [
-                { time: "19:00-20:00", title: "KBS 뉴스 9", desc: "오늘의 주요 뉴스와 심층 분석" },
-                { time: "20:00-21:00", title: "일일연속극", desc: "가족드라마 - 일상 속 따뜻한 이야기" }
-            ],
-            "KBS2": [
-                { time: "19:00-20:00", title: "개그콘서트", desc: "주말을 웃음으로 가득 채우는 코미디 쇼" },
-                { time: "20:00-22:00", title: "주말드라마", desc: "감동과 재미를 선사하는 프라임 드라마" }
-            ],
-            "MBC": [
-                { time: "19:00-20:00", title: "MBC 뉴스데스크", desc: "종합 뉴스 프로그램" },
-                { time: "20:00-21:30", title: "나 혼자 산다", desc: "1인 가구의 리얼 라이프 버라이어티" }
-            ],
-            "SBS": [
-                { time: "19:00-20:00", title: "SBS 8시 뉴스", desc: "오늘의 핫이슈와 속보" },
-                { time: "20:00-22:00", title: "런닝맨", desc: "대한민국 대표 예능 - 미션 레이스" }
-            ],
-            "tvN": [
-                { time: "19:00-20:30", title: "유 퀴즈 온 더 블럭", desc: "유재석과 조세호의 거리 토크쇼" },
-                { time: "20:30-22:00", title: "tvN 드라마", desc: "화제의 오리지널 시리즈" }
-            ],
-            "JTBC": [
-                { time: "19:00-20:00", title: "JTBC 뉴스룸", desc: "손석희 앵커의 심층 뉴스" },
-                { time: "20:00-21:30", title: "아는형님", desc: "전학생들의 재치있는 토크배틀" }
-            ],
-            "YTN": [
-                { time: "19:00-20:00", title: "YTN 뉴스", desc: "24시간 실시간 종합뉴스" },
-                { time: "20:00-21:00", title: "뉴스 특보", desc: "오늘의 주요 이슈 심층 분석" }
-            ],
-            "MNet": [
-                { time: "19:00-20:30", title: "엠카운트다운", desc: "K-POP 최신 차트와 무대" },
-                { time: "20:30-22:00", title: "Show Me The Money", desc: "힙합 서바이벌 오디션" }
-            ],
-            "tvN Sports": [
-                { time: "19:00-20:00", title: "스포츠 뉴스", desc: "오늘의 스포츠 하이라이트" },
-                { time: "20:00-22:00", title: "프로야구 중계", desc: "KBO 리그 생중계" }
-            ],
-            "KBSNSPORTS": [
-                { time: "19:00-21:00", title: "축구 중계", desc: "K리그 / 해외축구 생중계" },
-                { time: "21:00-22:00", title: "스포츠 매거진", desc: "스포츠 이슈와 인터뷰" }
-            ],
-            "EBS1": [
-                { time: "19:00-20:00", title: "다큐프라임", desc: "지식과 감동의 교양 다큐멘터리" },
-                { time: "20:00-21:00", title: "세계테마기행", desc: "세계 각국의 문화와 자연 탐방" }
-            ],
-            "채널A": [
-                { time: "19:00-20:00", title: "뉴스A", desc: "채널A 메인 뉴스" },
-                { time: "20:00-21:30", title: "나는 SOLO", desc: "솔로들의 진짜 연애 리얼리티" }
-            ],
-            "TV조선": [
-                { time: "19:00-20:00", title: "뉴스9", desc: "TV조선 종합 뉴스" },
-                { time: "20:00-22:00", title: "미스터트롯", desc: "트로트 서바이벌 오디션" }
-            ]
-        };
+        // ===== EPG PHASE 2: XMLTV & TIME-BASED MATCHING =====
+        // Real-time program matching with LocalStorage caching
+        // Supports XMLTV format for future integration
+
+        /**
+         * Lightweight XMLTV Parser
+         * Parses XMLTV format XML into structured program data
+         */
+        class XMLTVParser {
+            /**
+             * Parse XMLTV XML string into program data structure
+             * @param {string} xmlString - XMLTV format XML
+             * @returns {Object} Parsed data: { channels: Map, programmes: Array }
+             */
+            static parse(xmlString) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+
+                // Check for parse errors
+                const parseError = xmlDoc.querySelector('parsererror');
+                if (parseError) {
+                    throw new Error('XML parsing failed: ' + parseError.textContent);
+                }
+
+                // Parse channels
+                const channels = new Map();
+                xmlDoc.querySelectorAll('channel').forEach(ch => {
+                    const id = ch.getAttribute('id');
+                    const displayName = ch.querySelector('display-name')?.textContent || id;
+                    const icon = ch.querySelector('icon')?.getAttribute('src') || '';
+                    channels.set(id, { id, displayName, icon });
+                });
+
+                // Parse programmes
+                const programmes = [];
+                xmlDoc.querySelectorAll('programme').forEach(prog => {
+                    const channelId = prog.getAttribute('channel');
+                    const start = this.parseXMLTVTime(prog.getAttribute('start'));
+                    const stop = this.parseXMLTVTime(prog.getAttribute('stop'));
+                    const title = prog.querySelector('title')?.textContent || 'Unknown';
+                    const desc = prog.querySelector('desc')?.textContent || '';
+                    const category = prog.querySelector('category')?.textContent || '';
+
+                    programmes.push({
+                        channelId,
+                        start,
+                        stop,
+                        title,
+                        desc,
+                        category
+                    });
+                });
+
+                return { channels, programmes };
+            }
+
+            /**
+             * Parse XMLTV time format (YYYYMMDDHHmmss +ZZZZ) to Date object
+             * @param {string} xmltvTime - Time string in XMLTV format
+             * @returns {Date} JavaScript Date object
+             */
+            static parseXMLTVTime(xmltvTime) {
+                if (!xmltvTime) return null;
+
+                // Format: 20251004190000 +0900
+                const match = xmltvTime.match(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?/);
+                if (!match) return null;
+
+                const [, year, month, day, hour, minute, second, tz] = match;
+
+                // Create date string in ISO format
+                const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
+                // Parse timezone offset if present
+                if (tz) {
+                    const tzHours = parseInt(tz.slice(0, 3));
+                    const tzMinutes = parseInt(tz.slice(0, 1) + tz.slice(3, 5));
+                    const offsetMs = (tzHours * 60 + tzMinutes) * 60 * 1000;
+                    return new Date(new Date(isoString).getTime() - offsetMs);
+                }
+
+                return new Date(isoString);
+            }
+
+            /**
+             * Convert Date object to XMLTV time format
+             * @param {Date} date - JavaScript Date object
+             * @param {string} timezone - Timezone offset (e.g., '+0900')
+             * @returns {string} XMLTV format time string
+             */
+            static formatXMLTVTime(date, timezone = '+0900') {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hour = String(date.getHours()).padStart(2, '0');
+                const minute = String(date.getMinutes()).padStart(2, '0');
+                const second = String(date.getSeconds()).padStart(2, '0');
+
+                return `${year}${month}${day}${hour}${minute}${second} ${timezone}`;
+            }
+        }
+
+        /**
+         * EPG Data Manager with LocalStorage caching
+         */
+        class EPGDataManager {
+            static CACHE_KEY = 'kr_livetv_epg_cache';
+            static CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+            /**
+             * Get EPG data from cache or static fallback
+             * @returns {Object} EPG data object
+             */
+            static getData() {
+                // Try to load from cache first
+                const cached = this.loadFromCache();
+                if (cached) {
+                    console.log('✅ Loaded EPG from cache');
+                    return cached.data;
+                }
+
+                // Fallback to static data
+                console.log('📊 Using static EPG data');
+                const staticData = this.getStaticData();
+                this.saveToCache(staticData);
+                return staticData;
+            }
+
+            /**
+             * Load EPG data from LocalStorage cache
+             * @returns {Object|null} Cached data or null if expired/missing
+             */
+            static loadFromCache() {
+                try {
+                    const cached = localStorage.getItem(this.CACHE_KEY);
+                    if (!cached) return null;
+
+                    const { data, timestamp } = JSON.parse(cached);
+                    const age = Date.now() - timestamp;
+
+                    // Check if cache is still valid
+                    if (age < this.CACHE_DURATION) {
+                        return { data, age };
+                    } else {
+                        console.log('⏰ EPG cache expired, clearing...');
+                        this.clearCache();
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('Error loading EPG cache:', error);
+                    return null;
+                }
+            }
+
+            /**
+             * Save EPG data to LocalStorage cache
+             * @param {Object} data - EPG data to cache
+             */
+            static saveToCache(data) {
+                try {
+                    const cacheObject = {
+                        data,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheObject));
+                    console.log('💾 EPG data cached successfully');
+                } catch (error) {
+                    console.error('Error saving EPG cache:', error);
+                }
+            }
+
+            /**
+             * Clear EPG cache from LocalStorage
+             */
+            static clearCache() {
+                localStorage.removeItem(this.CACHE_KEY);
+            }
+
+            /**
+             * Fetch EPG data from XMLTV source (future implementation)
+             * @param {string} url - XMLTV data URL
+             * @returns {Promise<Object>} Parsed EPG data
+             */
+            static async fetchXMLTV(url) {
+                try {
+                    const response = await fetch(url);
+                    const xmlText = await response.text();
+                    const parsed = XMLTVParser.parse(xmlText);
+
+                    // Convert to our data format
+                    const epgData = this.convertParsedToEPGData(parsed);
+                    this.saveToCache(epgData);
+                    return epgData;
+                } catch (error) {
+                    console.error('Error fetching XMLTV:', error);
+                    throw error;
+                }
+            }
+
+            /**
+             * Convert parsed XMLTV data to our EPG data format
+             * @param {Object} parsed - Parsed XMLTV data
+             * @returns {Object} EPG data in our format
+             */
+            static convertParsedToEPGData(parsed) {
+                const epgData = {};
+
+                parsed.programmes.forEach(prog => {
+                    const channel = parsed.channels.get(prog.channelId);
+                    if (!channel) return;
+
+                    const channelName = channel.displayName;
+                    if (!epgData[channelName]) {
+                        epgData[channelName] = [];
+                    }
+
+                    epgData[channelName].push({
+                        start: prog.start,
+                        stop: prog.stop,
+                        title: prog.title,
+                        desc: prog.desc,
+                        category: prog.category
+                    });
+                });
+
+                return epgData;
+            }
+
+            /**
+             * Get extended static EPG data with full day schedule
+             * @returns {Object} Extended EPG data
+             */
+            static getStaticData() {
+                return {
+                    "KBS1": [
+                        { start: "06:00", stop: "07:00", title: "아침뉴스타임", desc: "새벽 속보와 날씨 정보" },
+                        { start: "07:00", stop: "08:30", title: "아침마당", desc: "시청자와 함께하는 생활정보 프로그램" },
+                        { start: "08:30", stop: "09:00", title: "아침 드라마", desc: "따뜻한 가족 이야기" },
+                        { start: "12:00", stop: "12:45", title: "KBS 뉴스 12", desc: "점심시간 주요 뉴스" },
+                        { start: "19:00", stop: "20:00", title: "KBS 뉴스 9", desc: "오늘의 주요 뉴스와 심층 분석" },
+                        { start: "20:00", stop: "21:00", title: "일일연속극", desc: "가족드라마 - 일상 속 따뜻한 이야기" },
+                        { start: "21:00", stop: "22:00", title: "시사토론", desc: "주요 이슈 심층 토론" }
+                    ],
+                    "KBS2": [
+                        { start: "07:30", stop: "09:00", title: "굿모닝 대한민국", desc: "아침을 여는 종합 정보 프로그램" },
+                        { start: "12:00", stop: "13:30", title: "생생정보", desc: "알짜 생활정보 가득" },
+                        { start: "18:00", stop: "19:00", title: "연예가중계", desc: "연예계 소식과 스타 인터뷰" },
+                        { start: "19:00", stop: "20:00", title: "개그콘서트", desc: "주말을 웃음으로 가득 채우는 코미디 쇼" },
+                        { start: "20:00", stop: "22:00", title: "주말드라마", desc: "감동과 재미를 선사하는 프라임 드라마" }
+                    ],
+                    "MBC": [
+                        { start: "06:30", stop: "08:00", title: "뉴스투데이", desc: "아침 종합 뉴스" },
+                        { start: "08:00", stop: "09:00", title: "기분 좋은 날", desc: "건강과 힐링 토크쇼" },
+                        { start: "12:00", stop: "13:20", title: "뉴스데스크", desc: "점심시간 뉴스" },
+                        { start: "19:00", stop: "20:00", title: "MBC 뉴스데스크", desc: "종합 뉴스 프로그램" },
+                        { start: "20:00", stop: "21:30", title: "나 혼자 산다", desc: "1인 가구의 리얼 라이프 버라이어티" },
+                        { start: "21:30", stop: "23:00", title: "황금어장", desc: "라디오스타 - 토크의 향연" }
+                    ],
+                    "SBS": [
+                        { start: "06:00", stop: "08:00", title: "모닝와이드", desc: "아침 종합 정보 프로그램" },
+                        { start: "12:00", stop: "12:40", title: "SBS 뉴스", desc: "점심 뉴스" },
+                        { start: "18:50", stop: "19:55", title: "SBS 뉴스", desc: "저녁 종합 뉴스" },
+                        { start: "19:55", stop: "21:00", title: "런닝맨", desc: "최고의 예능 버라이어티" },
+                        { start: "21:00", stop: "22:30", title: "미운 우리 새끼", desc: "가족 관찰 예능" },
+                        { start: "22:30", stop: "00:00", title: "주말 드라마", desc: "프라임타임 드라마" }
+                    ],
+                    "tvN": [
+                        { start: "07:30", stop: "09:00", title: "Live Info Show", desc: "아침 정보 프로그램" },
+                        { start: "19:00", stop: "20:30", title: "삼시세끼", desc: "자급자족 농촌 라이프" },
+                        { start: "20:30", stop: "22:00", title: "유 퀴즈 온 더 블럭", desc: "유재석의 거리 토크쇼" },
+                        { start: "22:00", stop: "23:30", title: "tvN 드라마", desc: "프리미엄 드라마 시리즈" }
+                    ],
+                    "JTBC": [
+                        { start: "08:00", stop: "10:00", title: "아침&", desc: "아침 뉴스 프로그램" },
+                        { start: "19:00", stop: "20:00", title: "JTBC 뉴스룸", desc: "손석희의 뉴스 브리핑" },
+                        { start: "20:00", stop: "21:30", title: "비정상회담", desc: "글로벌 토크쇼" },
+                        { start: "21:30", stop: "23:00", title: "아는형님", desc: "전학생 토크 예능" }
+                    ],
+                    "YTN": [
+                        { start: "00:00", stop: "06:00", title: "YTN 뉴스", desc: "24시간 실시간 뉴스" },
+                        { start: "06:00", stop: "09:00", title: "뉴스N이슈", desc: "아침 뉴스 심층 분석" },
+                        { start: "12:00", stop: "13:00", title: "뉴스와이드", desc: "점심 종합 뉴스" },
+                        { start: "19:00", stop: "20:00", title: "뉴스 나이트", desc: "저녁 주요 뉴스" }
+                    ],
+                    "MNet": [
+                        { start: "18:00", stop: "19:30", title: "엠카운트다운", desc: "K-POP 음악 차트쇼" },
+                        { start: "20:00", stop: "22:00", title: "I-LAND", desc: "아이돌 서바이벌 오디션" },
+                        { start: "22:00", stop: "23:30", title: "Show Me The Money", desc: "힙합 오디션 프로그램" }
+                    ],
+                    "OCN": [
+                        { start: "19:00", stop: "21:00", title: "범죄의 재구성", desc: "실화 범죄 다큐멘터리" },
+                        { start: "21:00", stop: "23:00", title: "스릴러 영화", desc: "긴장감 넘치는 액션 스릴러" },
+                        { start: "23:00", stop: "01:00", title: "미스터리 드라마", desc: "추리와 서스펜스" }
+                    ]
+                };
+            }
+        }
+
+        /**
+         * EPG Time Matcher
+         * Finds current and next programs based on current time
+         */
+        class EPGTimeMatcher {
+            /**
+             * Parse time string to minutes since midnight
+             * @param {string} timeStr - Time in format "HH:MM" or Date object
+             * @returns {number} Minutes since midnight
+             */
+            static parseTime(timeStr) {
+                if (timeStr instanceof Date) {
+                    return timeStr.getHours() * 60 + timeStr.getMinutes();
+                }
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+            }
+
+            /**
+             * Format minutes to HH:MM string
+             * @param {number} minutes - Minutes since midnight
+             * @returns {string} Time in HH:MM format
+             */
+            static formatTime(minutes) {
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            }
+
+            /**
+             * Get current and next programs for a channel
+             * @param {Array} channelPrograms - Array of program objects
+             * @param {Date} currentTime - Current time (optional, defaults to now)
+             * @returns {Object} { now: program, next: program }
+             */
+            static getCurrentAndNext(channelPrograms, currentTime = new Date()) {
+                if (!channelPrograms || channelPrograms.length === 0) {
+                    return { now: null, next: null };
+                }
+
+                const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+
+                // Sort programs by start time
+                const sortedPrograms = [...channelPrograms].sort((a, b) => {
+                    const aStart = this.parseTime(a.start);
+                    const bStart = this.parseTime(b.start);
+                    return aStart - bStart;
+                });
+
+                // Find current program
+                let currentProgram = null;
+                let nextProgram = null;
+
+                for (let i = 0; i < sortedPrograms.length; i++) {
+                    const program = sortedPrograms[i];
+                    const startMinutes = this.parseTime(program.start);
+                    const stopMinutes = this.parseTime(program.stop);
+
+                    // Handle programs that cross midnight
+                    const adjustedStop = stopMinutes < startMinutes ? stopMinutes + 24 * 60 : stopMinutes;
+                    const adjustedNow = nowMinutes < startMinutes && stopMinutes < startMinutes ? nowMinutes + 24 * 60 : nowMinutes;
+
+                    // Check if current time is within program time
+                    if (adjustedNow >= startMinutes && adjustedNow < adjustedStop) {
+                        currentProgram = program;
+                        nextProgram = sortedPrograms[i + 1] || sortedPrograms[0]; // Loop to first if at end
+                        break;
+                    }
+
+                    // If we passed the current time, this is the next program
+                    if (startMinutes > nowMinutes && !nextProgram) {
+                        nextProgram = program;
+                    }
+                }
+
+                // If no current program found, use last program as current and first as next
+                if (!currentProgram && sortedPrograms.length > 0) {
+                    currentProgram = sortedPrograms[sortedPrograms.length - 1];
+                    nextProgram = sortedPrograms[0];
+                }
+
+                return { now: currentProgram, next: nextProgram };
+            }
+
+            /**
+             * Format program time range for display
+             * @param {Object} program - Program object with start/stop
+             * @returns {string} Formatted time range "HH:MM-HH:MM"
+             */
+            static formatProgramTime(program) {
+                if (!program) return '';
+
+                if (program.start instanceof Date && program.stop instanceof Date) {
+                    const startStr = this.formatTime(program.start.getHours() * 60 + program.start.getMinutes());
+                    const stopStr = this.formatTime(program.stop.getHours() * 60 + program.stop.getMinutes());
+                    return `${startStr}-${stopStr}`;
+                }
+
+                return `${program.start}-${program.stop}`;
+            }
+        }
+
+        // Initialize EPG data with time-based matching
+        const epgDataSource = EPGDataManager.getData();
 
         // ===== CORE FUNCTIONS =====
 
@@ -711,12 +1056,12 @@
         }
 
         /**
-         * Create EPG tooltip HTML for a channel
+         * Create EPG tooltip HTML for a channel (Phase 2: Time-matched)
          * @param {string} channelName - Name of the channel
-         * @returns {string} HTML string for tooltip
+         * @returns {string} HTML string for EPG tooltip
          */
         function createEPGTooltip(channelName) {
-            const programs = epgData[channelName];
+            const programs = epgDataSource[channelName];
 
             if (!programs || programs.length === 0) {
                 return `
@@ -727,16 +1072,36 @@
                 `;
             }
 
-            const programsHTML = programs.map((program, index) => {
-                const badge = index === 0 ? '<span class="epg-badge">NOW</span>' : '<span class="epg-badge">NEXT</span>';
-                return `
+            // Get current and next programs based on real time
+            const { now, next } = EPGTimeMatcher.getCurrentAndNext(programs);
+
+            let programsHTML = '';
+
+            if (now) {
+                const timeRange = EPGTimeMatcher.formatProgramTime(now);
+                programsHTML += `
                     <div class="epg-program">
-                        <div class="epg-time">${program.time}${badge}</div>
-                        <div class="epg-title">${program.title}</div>
-                        <div class="epg-desc">${program.desc}</div>
+                        <div class="epg-time">${timeRange}<span class="epg-badge">NOW</span></div>
+                        <div class="epg-title">${now.title}</div>
+                        <div class="epg-desc">${now.desc}</div>
                     </div>
                 `;
-            }).join('');
+            }
+
+            if (next) {
+                const timeRange = EPGTimeMatcher.formatProgramTime(next);
+                programsHTML += `
+                    <div class="epg-program">
+                        <div class="epg-time">${timeRange}<span class="epg-badge">NEXT</span></div>
+                        <div class="epg-title">${next.title}</div>
+                        <div class="epg-desc">${next.desc}</div>
+                    </div>
+                `;
+            }
+
+            if (!programsHTML) {
+                programsHTML = '<div class="epg-no-data">📺 当前时段无节目信息 / No programs scheduled</div>';
+            }
 
             return `
                 <div class="epg-tooltip">
