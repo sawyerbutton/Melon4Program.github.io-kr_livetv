@@ -1229,24 +1229,18 @@
                     }
                 }
 
-                // Fallback: If no exact match found, show most recent past program as NOW
+                // Fallback: If no exact match found, only show NEXT (upcoming program)
+                // Don't show outdated programs as NOW to avoid confusion
                 if (!currentProgram && sortedPrograms.length > 0) {
-                    // If we have a program that ended recently, show it as "recently ended"
-                    // Otherwise, if all programs are in the future, show first upcoming as NEXT only
-                    if (lastProgramBeforeNow) {
-                        currentProgram = lastProgramBeforeNow;
+                    // Keep currentProgram as null (no misleading NOW badge)
+                    // Only show upcoming program as NEXT
+                    if (!nextProgram) {
+                        // Find first upcoming program
+                        nextProgram = sortedPrograms.find(p => this.parseTime(p.start) > nowMinutes);
+                        // If all programs are in the past, show first program as upcoming (next day)
                         if (!nextProgram) {
-                            // Find first program after lastProgramBeforeNow
-                            const lastIndex = sortedPrograms.indexOf(lastProgramBeforeNow);
-                            nextProgram = sortedPrograms[lastIndex + 1] || sortedPrograms[0];
+                            nextProgram = sortedPrograms[0];
                         }
-                    } else if (nextProgram) {
-                        // All programs are in the future, only show NEXT
-                        currentProgram = null;
-                    } else {
-                        // All programs are in the past, show last as recently ended
-                        currentProgram = sortedPrograms[sortedPrograms.length - 1];
-                        nextProgram = sortedPrograms[0]; // Loop to first
                     }
                 }
 
@@ -1405,6 +1399,7 @@
 
             let programsHTML = '';
 
+            // Show NOW program if exact match found
             if (now) {
                 const timeRange = EPGTimeMatcher.formatProgramTime(now);
                 programsHTML += `
@@ -1414,8 +1409,14 @@
                         <div class="epg-desc">${now.desc}</div>
                     </div>
                 `;
+            } else if (next) {
+                // If no NOW but have NEXT, show helpful message
+                programsHTML += `
+                    <div class="epg-no-data" style="margin-bottom: 8px;">⏳ 当前节目信息暂无 / Current program unavailable</div>
+                `;
             }
 
+            // Show NEXT program (upcoming)
             if (next) {
                 const timeRange = EPGTimeMatcher.formatProgramTime(next);
                 programsHTML += `
@@ -1427,8 +1428,9 @@
                 `;
             }
 
+            // If neither NOW nor NEXT available
             if (!programsHTML) {
-                programsHTML = '<div class="epg-no-data">📺 当前时段无节目信息 / No programs scheduled</div>';
+                programsHTML = '<div class="epg-no-data">📺 暂无节目信息 / No program data available</div>';
             }
 
             return `

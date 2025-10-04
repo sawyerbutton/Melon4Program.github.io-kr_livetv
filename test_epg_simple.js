@@ -92,21 +92,18 @@ function getCurrentAndNext(channelPrograms, currentTime = new Date()) {
         }
     }
 
-    // Fallback: If no exact match found, show most recent past program as NOW
+    // Fallback: If no exact match found, only show NEXT (upcoming program)
+    // Don't show outdated programs as NOW to avoid confusion
     if (!currentProgram && sortedPrograms.length > 0) {
-        if (lastProgramBeforeNow) {
-            currentProgram = lastProgramBeforeNow;
+        // Keep currentProgram as null (no misleading NOW badge)
+        // Only show upcoming program as NEXT
+        if (!nextProgram) {
+            // Find first upcoming program
+            nextProgram = sortedPrograms.find(p => parseTime(p.start) > nowMinutes);
+            // If all programs are in the past, show first program as upcoming (next day)
             if (!nextProgram) {
-                const lastIndex = sortedPrograms.indexOf(lastProgramBeforeNow);
-                nextProgram = sortedPrograms[lastIndex + 1] || sortedPrograms[0];
+                nextProgram = sortedPrograms[0];
             }
-        } else if (nextProgram) {
-            // All programs are in the future, only show NEXT
-            currentProgram = null;
-        } else {
-            // All programs are in the past, show last as recently ended
-            currentProgram = sortedPrograms[sortedPrograms.length - 1];
-            nextProgram = sortedPrograms[0];
         }
     }
 
@@ -145,7 +142,7 @@ const staticPrograms = [
 
 const { now: nowStatic, next: nextStatic } = getCurrentAndNext(staticPrograms);
 
-console.log('NOW:', nowStatic ? `${nowStatic.start}-${nowStatic.stop} ${nowStatic.title}` : 'None');
+console.log('NOW:', nowStatic ? `${nowStatic.start}-${nowStatic.stop} ${nowStatic.title}` : 'null (no exact match)');
 console.log('NEXT:', nextStatic ? `${nextStatic.start}-${nextStatic.stop} ${nextStatic.title}` : 'None');
 
 // Validate
@@ -159,19 +156,19 @@ if (nowStatic) {
     const isValid = nowMinutes >= startMin && nowMinutes < stopMin;
 
     if (isValid) {
-        console.log('✅ Static data NOW program matches current time');
+        console.log('✅ Static data NOW program matches current time exactly');
     } else {
         console.log(`❌ Static data NOW program DOES NOT match current time`);
         console.log(`   Expected range: ${startMin}-${stopMin} minutes`);
         console.log(`   Current time: ${nowMinutes} minutes`);
+        console.log(`   ⚠️  This should not happen - NOW should only show exact matches`);
     }
-}
-
-// Check for 21:00 bug
-if (nowStatic && nowStatic.start === "21:00" && beijingHour < 21) {
-    console.log('❌ BUG: 21:00-22:00 incorrectly shown as NOW');
-} else if (nowStatic && nowStatic.start === "21:00") {
-    console.log('ℹ️  21:00 shown as NOW (may be correct if current time is after 21:00)');
+} else {
+    // No NOW is acceptable if no exact match
+    console.log('✅ No NOW program (expected - no exact time match)');
+    if (nextStatic) {
+        console.log('✅ Showing only NEXT (upcoming) program - good UX');
+    }
 }
 
 console.log('');
@@ -263,25 +260,51 @@ console.log('─'.repeat(60));
 
 let hasError = false;
 
-// Final validation
-if (nowStatic && nowStatic.start === "21:00" && beijingHour < 21) {
-    console.log('❌ FAIL: 21:00 bug still present in static data');
-    hasError = true;
+// Test 1: No outdated programs shown as NOW
+if (nowStatic) {
+    const [startH, startM] = nowStatic.start.split(':').map(Number);
+    const [stopH, stopM] = nowStatic.stop.split(':').map(Number);
+    const startMin = startH * 60 + startM;
+    const stopMin = stopH * 60 + stopM;
+    const isValid = nowMinutes >= startMin && nowMinutes < stopMin;
+
+    if (!isValid) {
+        console.log('❌ FAIL: Static data shows non-current program as NOW');
+        console.log(`   ${nowStatic.start}-${nowStatic.stop} shown as NOW at ${beijingHour}:${String(beijingMinute).padStart(2, '0')}`);
+        hasError = true;
+    }
 }
 
-if (nowXMLTV && nowXMLTV.title.includes('21:00') && beijingHour < 20) {
-    console.log('❌ FAIL: 21:00 bug present in XMLTV data');
-    hasError = true;
+// Test 2: XMLTV data accuracy
+if (nowXMLTV) {
+    const startMin = parseTime(nowXMLTV.start);
+    const stopMin = parseTime(nowXMLTV.stop);
+    const isValid = nowMinutes >= startMin && nowMinutes < stopMin;
+
+    if (!isValid) {
+        console.log('❌ FAIL: XMLTV data shows non-current program as NOW');
+        hasError = true;
+    }
+}
+
+// Test 3: Check that NEXT is shown when NOW is missing
+if (!nowStatic && nextStatic) {
+    console.log('✅ PASS: No NOW shown (correct), NEXT shown (upcoming program)');
+}
+
+if (!nowXMLTV && nextXMLTV) {
+    console.log('✅ PASS: XMLTV - No NOW shown (correct), NEXT shown');
 }
 
 if (!hasError) {
-    console.log('✅ PASS: Time matching logic appears correct');
-    console.log('ℹ️  If browser still shows wrong time, check:');
-    console.log('   1. Browser cache (hard refresh: Ctrl+Shift+R)');
-    console.log('   2. LocalStorage data (may contain old cached EPG)');
-    console.log('   3. Service worker cache (if any)');
+    console.log('✅ PASS: Time matching logic is accurate');
+    console.log('✅ Only exact matches shown as NOW');
+    console.log('✅ Upcoming programs shown as NEXT when NOW unavailable');
+    console.log('\nℹ️  Browser display:');
+    console.log('   - If no exact match: Shows "⏳ 当前节目信息暂无" + NEXT program');
+    console.log('   - If exact match: Shows NOW + NEXT programs');
 } else {
-    console.log('❌ FAIL: Time matching logic has bugs');
+    console.log('❌ FAIL: Time matching logic has accuracy issues');
 }
 
 process.exit(hasError ? 1 : 0);
