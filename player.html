@@ -7,6 +7,7 @@
 ║                                                                              ║
 ║  Features:                                                                   ║
 ║    • 70+ Korean TV channels (News, Sports, Entertainment, Kids, etc.)       ║
+║    • EPG (Electronic Program Guide) tooltips with NOW/NEXT info             ║
 ║    • Pure CSS channel buttons (no external image dependencies)              ║
 ║    • Optimized rendering with DocumentFragment                              ║
 ║    • Search functionality to filter channels                                ║
@@ -24,8 +25,8 @@
 ║    • Chrome, Firefox, Edge: Uses HLS.js                                     ║
 ║    • Safari, iOS: Native HLS support                                        ║
 ║                                                                              ║
-║  Version: 2.0                                                                ║
-║  Last Updated: 2025-10-03                                                    ║
+║  Version: 2.1                                                                ║
+║  Last Updated: 2025-10-04                                                    ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 -->
 <!DOCTYPE html>
@@ -187,7 +188,7 @@
             justify-content: center;
             word-wrap: break-word;
             position: relative;
-            overflow: hidden;
+            overflow: visible; /* Changed from hidden to visible for EPG tooltip */
         }
 
         .channel-btn::before {
@@ -200,6 +201,7 @@
             background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
             opacity: 0;
             transition: opacity 0.3s;
+            border-radius: 12px; /* Match button border-radius to contain effect */
         }
 
         .channel-btn:hover {
@@ -307,6 +309,121 @@
                 transform: translateX(0);
                 opacity: 1;
             }
+        }
+
+        /* ===== EPG TOOLTIP STYLES ===== */
+        .epg-tooltip {
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.98) 0%, rgba(118, 75, 162, 0.98) 100%);
+            color: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-width: 280px;
+            max-width: 320px;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .epg-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid rgba(118, 75, 162, 0.98);
+        }
+
+        .channel-btn:hover .epg-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-5px);
+        }
+
+        .epg-tooltip h4 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: 700;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .epg-tooltip h4::before {
+            content: '📺';
+            font-size: 18px;
+        }
+
+        .epg-program {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid #fee140;
+        }
+
+        .epg-program:last-child {
+            margin-bottom: 0;
+            border-left-color: #a8edea;
+        }
+
+        .epg-time {
+            font-size: 11px;
+            font-weight: 600;
+            color: #fee140;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .epg-time::before {
+            content: '🕒';
+            font-size: 12px;
+        }
+
+        .epg-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 3px;
+            line-height: 1.3;
+        }
+
+        .epg-desc {
+            font-size: 11px;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .epg-badge {
+            display: inline-block;
+            background: rgba(254, 225, 64, 0.3);
+            color: #fee140;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+
+        .epg-no-data {
+            text-align: center;
+            padding: 12px;
+            font-size: 13px;
+            opacity: 0.8;
+            font-style: italic;
         }
     </style>
 </head>
@@ -447,6 +564,64 @@
             { name: "현대홈쇼핑", url: "https://live-edge-th136.myjktv.com:443/watch/live.m3u8?video=hyundaih_mall_540&sid=kRIZglDoTkTX95OSEfXY5VUZFpfFq6cVReRRuWSR&secret=fb19ea96320fbea13ea32914018bf9af&time=1742560145", category: "entertainment" }
         ];
 
+        // ===== EPG DATA (Electronic Program Guide) =====
+        // Static program schedule data for demonstration
+        // Format: { "ChannelName": [{ time, title, desc }, ...] }
+        const epgData = {
+            "KBS1": [
+                { time: "19:00-20:00", title: "KBS 뉴스 9", desc: "오늘의 주요 뉴스와 심층 분석" },
+                { time: "20:00-21:00", title: "일일연속극", desc: "가족드라마 - 일상 속 따뜻한 이야기" }
+            ],
+            "KBS2": [
+                { time: "19:00-20:00", title: "개그콘서트", desc: "주말을 웃음으로 가득 채우는 코미디 쇼" },
+                { time: "20:00-22:00", title: "주말드라마", desc: "감동과 재미를 선사하는 프라임 드라마" }
+            ],
+            "MBC": [
+                { time: "19:00-20:00", title: "MBC 뉴스데스크", desc: "종합 뉴스 프로그램" },
+                { time: "20:00-21:30", title: "나 혼자 산다", desc: "1인 가구의 리얼 라이프 버라이어티" }
+            ],
+            "SBS": [
+                { time: "19:00-20:00", title: "SBS 8시 뉴스", desc: "오늘의 핫이슈와 속보" },
+                { time: "20:00-22:00", title: "런닝맨", desc: "대한민국 대표 예능 - 미션 레이스" }
+            ],
+            "tvN": [
+                { time: "19:00-20:30", title: "유 퀴즈 온 더 블럭", desc: "유재석과 조세호의 거리 토크쇼" },
+                { time: "20:30-22:00", title: "tvN 드라마", desc: "화제의 오리지널 시리즈" }
+            ],
+            "JTBC": [
+                { time: "19:00-20:00", title: "JTBC 뉴스룸", desc: "손석희 앵커의 심층 뉴스" },
+                { time: "20:00-21:30", title: "아는형님", desc: "전학생들의 재치있는 토크배틀" }
+            ],
+            "YTN": [
+                { time: "19:00-20:00", title: "YTN 뉴스", desc: "24시간 실시간 종합뉴스" },
+                { time: "20:00-21:00", title: "뉴스 특보", desc: "오늘의 주요 이슈 심층 분석" }
+            ],
+            "MNet": [
+                { time: "19:00-20:30", title: "엠카운트다운", desc: "K-POP 최신 차트와 무대" },
+                { time: "20:30-22:00", title: "Show Me The Money", desc: "힙합 서바이벌 오디션" }
+            ],
+            "tvN Sports": [
+                { time: "19:00-20:00", title: "스포츠 뉴스", desc: "오늘의 스포츠 하이라이트" },
+                { time: "20:00-22:00", title: "프로야구 중계", desc: "KBO 리그 생중계" }
+            ],
+            "KBSNSPORTS": [
+                { time: "19:00-21:00", title: "축구 중계", desc: "K리그 / 해외축구 생중계" },
+                { time: "21:00-22:00", title: "스포츠 매거진", desc: "스포츠 이슈와 인터뷰" }
+            ],
+            "EBS1": [
+                { time: "19:00-20:00", title: "다큐프라임", desc: "지식과 감동의 교양 다큐멘터리" },
+                { time: "20:00-21:00", title: "세계테마기행", desc: "세계 각국의 문화와 자연 탐방" }
+            ],
+            "채널A": [
+                { time: "19:00-20:00", title: "뉴스A", desc: "채널A 메인 뉴스" },
+                { time: "20:00-21:30", title: "나는 SOLO", desc: "솔로들의 진짜 연애 리얼리티" }
+            ],
+            "TV조선": [
+                { time: "19:00-20:00", title: "뉴스9", desc: "TV조선 종합 뉴스" },
+                { time: "20:00-22:00", title: "미스터트롯", desc: "트로트 서바이벌 오디션" }
+            ]
+        };
+
         // ===== CORE FUNCTIONS =====
 
         /**
@@ -536,6 +711,42 @@
         }
 
         /**
+         * Create EPG tooltip HTML for a channel
+         * @param {string} channelName - Name of the channel
+         * @returns {string} HTML string for tooltip
+         */
+        function createEPGTooltip(channelName) {
+            const programs = epgData[channelName];
+
+            if (!programs || programs.length === 0) {
+                return `
+                    <div class="epg-tooltip">
+                        <h4>${channelName}</h4>
+                        <div class="epg-no-data">📺 节目信息暂无 / No program data available</div>
+                    </div>
+                `;
+            }
+
+            const programsHTML = programs.map((program, index) => {
+                const badge = index === 0 ? '<span class="epg-badge">NOW</span>' : '<span class="epg-badge">NEXT</span>';
+                return `
+                    <div class="epg-program">
+                        <div class="epg-time">${program.time}${badge}</div>
+                        <div class="epg-title">${program.title}</div>
+                        <div class="epg-desc">${program.desc}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="epg-tooltip">
+                    <h4>${channelName}</h4>
+                    ${programsHTML}
+                </div>
+            `;
+        }
+
+        /**
          * Render channel buttons using DocumentFragment for better performance
          */
         function renderChannels() {
@@ -544,10 +755,15 @@
             channels.forEach(channel => {
                 const btn = document.createElement('button');
                 btn.className = 'channel-btn';
-                btn.textContent = channel.name;
                 btn.dataset.category = channel.category;
                 btn.dataset.name = channel.name.toLowerCase();
                 btn.setAttribute('aria-label', `Play ${channel.name}`);
+
+                // Add channel name and EPG tooltip
+                btn.innerHTML = `
+                    ${channel.name}
+                    ${createEPGTooltip(channel.name)}
+                `;
 
                 btn.addEventListener('click', () => {
                     playChannel(channel.url, channel.name, btn);
@@ -627,17 +843,6 @@
 
         // Render all channels on page load
         renderChannels();
-
-        // Auto-play the first channel (optional)
-        if (channels.length > 0) {
-            const firstBtn = channelGrid.querySelector('.channel-btn');
-            if (firstBtn) {
-                // Add small delay for better UX
-                setTimeout(() => {
-                    playChannel(channels[0].url, channels[0].name, firstBtn);
-                }, 500);
-            }
-        }
 
         // Log initialization
         console.log(`✅ Player initialized with ${channels.length} channels`);
