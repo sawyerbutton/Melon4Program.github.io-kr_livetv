@@ -44,6 +44,9 @@
     <!-- HLS.js library for HTTP Live Streaming support -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
+    <!-- pako.js library for gzip decompression (Phase 2.5: Live XMLTV) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
     <style>
         /* ===== GLOBAL STYLES ===== */
         * {
@@ -666,12 +669,59 @@
             }
         }
 
+        // ===== CHANNEL ID MAPPING (Phase 2.5: Live XMLTV Integration) =====
+
         /**
-         * EPG Data Manager with LocalStorage caching
+         * Channel ID mapping for XMLTV data
+         * Maps project channel names to EPGSHARE01 XMLTV channel IDs
+         */
+        const CHANNEL_ID_MAPPING = {
+            // Major Broadcasters (Confirmed)
+            "KBS2": "KBS2.kr",
+            "MBC": "MBC.ON.kr",
+            "tvN": "tvN.STORY.kr",
+            "JTBC": "JTBC4.kr",
+            "YTN": "YTN.kr",
+            "OCN": "OCN.kr",
+
+            // Specialized Channels (Confirmed)
+            "중화TV": "중화TV.kr",
+            "KBS Drama": "KBS.Drama.kr",
+            "KBS Kids": "KBS.Kids.kr",
+            "KBS Joy": "KBS.Joy.kr",
+            "ENA": "ENA.kr",
+            "MBC드라마": "MBC드라마.kr",
+
+            // To be verified (fallback to best guess)
+            "KBS1": "KBS1.kr",
+            "SBS": "SBS.kr",
+            "EBS1": "EBS1.kr",
+            "EBS2": "EBS2.kr",
+
+            // Multiple possible IDs (try first match)
+            "OCN Movies": "OCN.Movies.kr",
+            "OCN Movies2": "OCN.Movies2.kr",
+            "JTBC Golf": "JTBC.Golf.kr",
+            "SBS Golf": "SBS.Golf.kr",
+            "SBS Golf2": "SBS.Golf2.kr",
+            "tvN Sports": "tvN.Sports.kr",
+            "KBSNSPORTS": "KBS.N.Sports.kr",
+            "MBC SPORTS": "MBC.SPORTS+.kr",
+            "MNet": "Mnet.kr"
+        };
+
+        /**
+         * EPG Data Manager with LocalStorage caching and live XMLTV fetching
          */
         class EPGDataManager {
             static CACHE_KEY = 'kr_livetv_epg_cache';
+            static CACHE_KEY_LIVE = 'kr_livetv_epg_cache_live';
             static CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+            // Phase 2.5: Live XMLTV Configuration
+            static XMLTV_URL = 'https://epgshare01.online/epgshare01/epg_ripper_KR1.xml.gz';
+            static CORS_PROXY = 'https://corsproxy.io/?';
+            static USE_LIVE_EPG = true; // Toggle for live EPG
 
             /**
              * Get EPG data from cache or static fallback
@@ -690,6 +740,26 @@
                 const staticData = this.getStaticData();
                 this.saveToCache(staticData);
                 return staticData;
+            }
+
+            /**
+             * Initialize EPG data - try live XMLTV first, fallback to cache/static
+             * @returns {Promise<Object>} EPG data object
+             */
+            static async initializeEPG() {
+                if (!this.USE_LIVE_EPG) {
+                    return this.getData();
+                }
+
+                try {
+                    console.log('🌐 Attempting to fetch live EPG data...');
+                    const liveData = await this.fetchLiveXMLTV();
+                    console.log('✅ Live EPG data loaded successfully');
+                    return liveData;
+                } catch (error) {
+                    console.warn('⚠️ Live EPG fetch failed, using fallback:', error.message);
+                    return this.getData();
+                }
             }
 
             /**
@@ -743,7 +813,69 @@
             }
 
             /**
-             * Fetch EPG data from XMLTV source (future implementation)
+             * Decompress gzipped data using pako.js
+             * @param {ArrayBuffer} gzipData - Gzipped data
+             * @returns {string} Decompressed XML string
+             */
+            static decompressGzip(gzipData) {
+                try {
+                    const uint8Array = new Uint8Array(gzipData);
+                    const decompressed = pako.inflate(uint8Array, { to: 'string' });
+                    return decompressed;
+                } catch (error) {
+                    console.error('Gzip decompression failed:', error);
+                    throw new Error('Failed to decompress XMLTV data');
+                }
+            }
+
+            /**
+             * Fetch live XMLTV data from EPGSHARE01
+             * @returns {Promise<Object>} Parsed EPG data
+             */
+            static async fetchLiveXMLTV() {
+                try {
+                    // 1. Construct proxied URL
+                    const proxiedURL = this.CORS_PROXY + encodeURIComponent(this.XMLTV_URL);
+                    console.log('📡 Fetching XMLTV from:', this.XMLTV_URL);
+
+                    // 2. Fetch gzipped XMLTV file
+                    const response = await fetch(proxiedURL);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    // 3. Get ArrayBuffer for gzip decompression
+                    const arrayBuffer = await response.arrayBuffer();
+                    console.log(`📦 Downloaded ${(arrayBuffer.byteLength / 1024).toFixed(2)} KB (gzipped)`);
+
+                    // 4. Decompress gzip
+                    const xmlText = this.decompressGzip(arrayBuffer);
+                    console.log(`📄 Decompressed to ${(xmlText.length / 1024).toFixed(2)} KB (XML)`);
+
+                    // 5. Parse XMLTV
+                    const parsed = XMLTVParser.parse(xmlText);
+                    console.log(`📺 Found ${parsed.channels.size} channels, ${parsed.programmes.length} programmes`);
+
+                    // 6. Convert to our format with channel mapping
+                    const epgData = this.convertParsedToEPGDataWithMapping(parsed);
+
+                    // 7. Save to cache
+                    this.saveToCache(epgData);
+                    localStorage.setItem(this.CACHE_KEY_LIVE, JSON.stringify({
+                        data: epgData,
+                        timestamp: Date.now(),
+                        source: 'EPGSHARE01'
+                    }));
+
+                    return epgData;
+                } catch (error) {
+                    console.error('❌ Live XMLTV fetch failed:', error);
+                    throw error;
+                }
+            }
+
+            /**
+             * Fetch EPG data from XMLTV source (legacy method)
              * @param {string} url - XMLTV data URL
              * @returns {Promise<Object>} Parsed EPG data
              */
@@ -789,6 +921,56 @@
                     });
                 });
 
+                return epgData;
+            }
+
+            /**
+             * Convert parsed XMLTV data to our EPG format using channel ID mapping
+             * @param {Object} parsed - Parsed XMLTV data
+             * @returns {Object} EPG data in our format with mapped channel names
+             */
+            static convertParsedToEPGDataWithMapping(parsed) {
+                const epgData = {};
+                const unmappedChannels = new Set();
+
+                // Create reverse mapping: XMLTV ID → Project Channel Name
+                const reverseMapping = {};
+                for (const [projectName, xmltvId] of Object.entries(CHANNEL_ID_MAPPING)) {
+                    reverseMapping[xmltvId] = projectName;
+                }
+
+                parsed.programmes.forEach(prog => {
+                    const channel = parsed.channels.get(prog.channelId);
+                    if (!channel) return;
+
+                    // Try to find mapped project channel name
+                    let projectChannelName = reverseMapping[prog.channelId];
+
+                    // If not found in mapping, use display name as fallback
+                    if (!projectChannelName) {
+                        projectChannelName = channel.displayName;
+                        unmappedChannels.add(`${channel.displayName} (${prog.channelId})`);
+                    }
+
+                    if (!epgData[projectChannelName]) {
+                        epgData[projectChannelName] = [];
+                    }
+
+                    epgData[projectChannelName].push({
+                        start: prog.start,
+                        stop: prog.stop,
+                        title: prog.title,
+                        desc: prog.desc || '',
+                        category: prog.category || ''
+                    });
+                });
+
+                // Log unmapped channels for manual review
+                if (unmappedChannels.size > 0) {
+                    console.log('📋 Unmapped channels:', Array.from(unmappedChannels).slice(0, 10));
+                }
+
+                console.log(`✅ Mapped EPG data for ${Object.keys(epgData).length} channels`);
                 return epgData;
             }
 
@@ -964,8 +1146,18 @@
             }
         }
 
-        // Initialize EPG data with time-based matching
-        const epgDataSource = EPGDataManager.getData();
+        // Initialize EPG data (will be populated asynchronously)
+        let epgDataSource = EPGDataManager.getData(); // Sync fallback
+
+        // Asynchronously load live EPG data (Phase 2.5)
+        (async function initializeEPGData() {
+            try {
+                epgDataSource = await EPGDataManager.initializeEPG();
+                console.log('🎉 EPG data initialized with', Object.keys(epgDataSource).length, 'channels');
+            } catch (error) {
+                console.error('EPG initialization error:', error);
+            }
+        })();
 
         // ===== CORE FUNCTIONS =====
 
