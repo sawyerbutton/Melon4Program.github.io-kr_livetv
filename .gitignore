@@ -1,3 +1,142 @@
+# Korean Live TV Player - Git Ignore Configuration
+# Project: Melon4Program.github.io-kr_livetv
+
+# ===== Node.js =====
 node_modules/
-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log*
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+
+# ===== Claude Code =====
+.claude/
+.claude-*
+
+# ===== IDEs & Editors =====
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (WebStorm, PyCharm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw[a-z]
+
+# Emacs
+\#*\#
+.\#*
+
+# ===== Operating Systems =====
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ===== Build & Distribution =====
+dist/
+build/
+*.min.js
+*.min.css
+*.map
+
+# ===== Testing =====
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+screenshots/
+test-results/
+
+# ===== Temporary Files =====
+*.tmp
+*.temp
+*.bak
+*.swp
+*.cache
+.cache/
+tmp/
+temp/
+
+# ===== Logs =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ===== Environment Variables =====
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# ===== Project Specific =====
+# Puppeteer cache (browser downloads)
+.local-chromium/
+
+# EPG cache files (if we generate any)
+*.epg.cache
+epg-cache/
+
+# Stream URL backups (sensitive data)
+stream-urls-*.txt
+
+# Local development configurations
+config.local.js
+config.local.json
+
+# ===== Optional: Uncomment if needed =====
+# Large media files (if any)
+# *.mp4
+# *.avi
+# *.mov
+
+# Compressed archives
+# *.zip
+# *.tar.gz
+# *.rar
