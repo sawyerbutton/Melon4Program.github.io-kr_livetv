@@ -625,8 +625,9 @@
 
             /**
              * Parse XMLTV time format (YYYYMMDDHHmmss +ZZZZ) to Date object
-             * @param {string} xmltvTime - Time string in XMLTV format
-             * @returns {Date} JavaScript Date object
+             * FIXED: Correctly handles timezone conversion
+             * @param {string} xmltvTime - Time string in XMLTV format (e.g., "20251004103000 +0900")
+             * @returns {Date} JavaScript Date object in local timezone
              */
             static parseXMLTVTime(xmltvTime) {
                 if (!xmltvTime) return null;
@@ -637,17 +638,17 @@
 
                 const [, year, month, day, hour, minute, second, tz] = match;
 
-                // Create date string in ISO format
-                const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-
-                // Parse timezone offset if present
                 if (tz) {
-                    const tzHours = parseInt(tz.slice(0, 3));
-                    const tzMinutes = parseInt(tz.slice(0, 1) + tz.slice(3, 5));
-                    const offsetMs = (tzHours * 60 + tzMinutes) * 60 * 1000;
-                    return new Date(new Date(isoString).getTime() - offsetMs);
+                    // Convert timezone offset from "+0900" to "+09:00" format
+                    const tzFormatted = tz.slice(0, 3) + ':' + tz.slice(3);
+                    // Create ISO 8601 string with timezone: "2025-10-04T10:30:00+09:00"
+                    const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}${tzFormatted}`;
+                    // Browser automatically converts to local timezone
+                    return new Date(isoString);
                 }
 
+                // No timezone info, assume local time
+                const isoString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
                 return new Date(isoString);
             }
 
