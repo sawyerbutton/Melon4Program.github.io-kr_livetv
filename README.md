@@ -7,6 +7,11 @@
 ## **✨ Features**
 
 - 🎬 **70+ Live Channels** - Access to major Korean broadcasters and cable networks
+- 📺 **Live EPG System** - Real-time Electronic Program Guide with NOW/NEXT information
+  - 100+ Korean channels EPG data from XMLTV
+  - Smart caching with 24-hour auto-refresh
+  - Beijing timezone display for Chinese users
+  - Hover tooltips with current and upcoming programs
 - 🎨 **Modern UI Design** - Beautiful gradient buttons with pure CSS (no external image dependencies)
 - 🔍 **Smart Search** - Instantly filter channels by name
 - 📱 **Fully Responsive** - Optimized for desktop, tablet, and mobile devices
@@ -16,6 +21,7 @@
 - 🔄 **Error Handling** - Graceful error messages and loading indicators
 - ⌨️ **Keyboard Shortcuts** - Press `/` or `Ctrl+F` to quickly access search
 - 🌐 **Bilingual Interface** - English and Chinese (中文) support
+- 🧪 **Automated Testing** - Built-in EPG logic tests for reliability
 
 ---
 
@@ -168,7 +174,38 @@ The player has been optimized for maximum performance:
 
 ## **📝 Version History**
 
-### Version 2.0.1 (Latest - 2025-10-03)
+### Version 2.2.5 (Latest - 2025-10-04)
+- 📺 **EPG Phase 2.5: Live XMLTV Integration**
+  - Real-time EPG data from EPGSHARE01 (100+ Korean channels)
+  - Client-side gzip decompression with pako.js
+  - Smart caching with 92% data reduction (24-hour window)
+  - Beijing timezone display for Chinese users
+  - Accurate NOW/NEXT program matching
+- 🧪 **Added Automated Testing**
+  - EPG logic tests (`test_epg_simple.js`)
+  - E2E browser tests (`test_epg.js`)
+- 🎯 **UX Improvements**
+  - Only show exact time matches as NOW
+  - Show "Current program unavailable" when no exact match
+  - Always display upcoming NEXT program
+- 📚 **Documentation**
+  - Comprehensive EPG data source research report
+  - Enhanced CLAUDE.md with testing workflow
+
+### Version 2.2 (2025-10-04)
+- 📺 **EPG Phase 2: XMLTV Parser & Time-Based Matching**
+  - XMLTVParser, EPGDataManager, EPGTimeMatcher classes
+  - LocalStorage caching with 24-hour expiration
+  - Real-time NOW/NEXT program detection
+  - Extended static EPG data for 9 major channels
+
+### Version 2.1 (2025-10-04)
+- 📺 **EPG Phase 1: Static Data Implementation**
+  - Hover tooltips showing NOW/NEXT programs
+  - Beautiful gradient tooltip design with blur effect
+  - Bilingual support (Korean/Chinese)
+
+### Version 2.0.1 (2025-10-03)
 - 🐛 Fixed WSL/Linux browser launch errors in startup script
 - 🎨 Added favicon to eliminate browser 404 errors
 - 🧹 Cleaner server logs without unnecessary warnings
